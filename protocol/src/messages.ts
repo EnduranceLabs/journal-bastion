@@ -9,7 +9,7 @@ export const AuthenticateMessageSchema = z.object({
   type: z.literal("authenticate"),
   token: z.string(),
   protocolVersion: z.number(),
-  gatewayVersion: z.string(),
+  bastionVersion: z.string(),
 });
 
 export type AuthenticateMessage = z.infer<typeof AuthenticateMessageSchema>;

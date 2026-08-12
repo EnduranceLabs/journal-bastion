@@ -41,7 +41,7 @@ export interface ConnectedBastion {
   id: string;
   organizationId: string;
   protocolVersion: number;
-  gatewayVersion: string;
+  bastionVersion: string;
   integrations: Integration[];
   mcpVersion: string | null;
   skillsVersion: string | null;
@@ -481,7 +481,7 @@ export class BastionServer {
     let authenticated = false;
     let organizationId = "";
     let protocolVersion = 0;
-    let gatewayVersion = "unknown";
+    let bastionVersion = "unknown";
 
     const authTimer = setTimeout(() => {
       if (!authenticated) {
@@ -505,7 +505,7 @@ export class BastionServer {
             authenticated = true;
             organizationId = result.organizationId;
             protocolVersion = msg.protocolVersion;
-            gatewayVersion = msg.gatewayVersion;
+            bastionVersion = msg.bastionVersion;
             ws.send(
               JSON.stringify({
                 type: "authenticated",
@@ -574,7 +574,7 @@ export class BastionServer {
               id: connId,
               organizationId,
               protocolVersion,
-              gatewayVersion,
+              bastionVersion,
               integrations: [],
               mcpVersion,
               skillsVersion,

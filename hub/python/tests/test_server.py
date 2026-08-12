@@ -47,7 +47,7 @@ async def connect_and_auth(url: str, token: str) -> websockets.asyncio.client.Cl
         "type": "authenticate",
         "token": token,
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
     raw = await ws.recv()
     msg = json.loads(raw)
@@ -438,7 +438,7 @@ async def test_pong_timeout_disconnects_bastion():
         "type": "authenticate",
         "token": "gw_valid",
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
     msg = json.loads(await ws.recv())
     assert msg["type"] == "authenticated"
@@ -549,7 +549,7 @@ async def test_on_socket_error_fires_on_token_validator_failure():
         "type": "authenticate",
         "token": "gw_valid",
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
 
     with pytest.raises(websockets.exceptions.ConnectionClosed):

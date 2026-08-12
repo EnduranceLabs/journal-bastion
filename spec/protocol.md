@@ -1,6 +1,6 @@
 # Journal Bastion Protocol
 
-Version: `2`
+Version: `3`
 
 ## Problem
 
@@ -63,15 +63,15 @@ Sent immediately after the WebSocket connection opens.
 |-------|------|----------|-------------|
 | `type` | `"authenticate"` | yes | Message discriminator |
 | `token` | `string` | yes | Bastion auth token (`gw_*` prefix) |
-| `protocolVersion` | `number` | yes | Protocol version (currently `2`) |
-| `gatewayVersion` | `string` | yes | Bastion software version (semver) |
+| `protocolVersion` | `number` | yes | Protocol version (currently `3`) |
+| `bastionVersion` | `string` | yes | Bastion software version (semver) |
 
 ```json
 {
   "type": "authenticate",
   "token": "gw_abc123",
   "protocolVersion": 2,
-  "gatewayVersion": "0.1.0"
+  "bastionVersion": "0.1.0"
 }
 ```
 

@@ -14,7 +14,7 @@ import { Telemetry } from "./telemetry.js";
 import type { ToolCallOutcome } from "./types.js";
 import { AuditLogger } from "./audit.js";
 
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 3;
 const AUTH_TIMEOUT_MS = 10_000;
 const TOOL_CALL_TIMEOUT_MS = 60_000;
 
@@ -172,7 +172,7 @@ export class BastionConnection {
           type: "authenticate",
           token: this.config.token,
           protocolVersion: PROTOCOL_VERSION,
-          gatewayVersion: VERSION,
+          bastionVersion: VERSION,
         });
       });
 

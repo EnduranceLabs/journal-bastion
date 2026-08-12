@@ -351,7 +351,7 @@ class BastionServer:
                 return
 
             protocol_version = msg.get("protocolVersion", 0)
-            bastion_version = msg.get("gatewayVersion", "unknown")
+            bastion_version = msg.get("bastionVersion", "unknown")
 
             result = await self._validate_token(msg["token"])
             if result is None:

@@ -117,7 +117,7 @@ describe("BastionConnection", () => {
     const authMsg = JSON.parse(ws.sent[0]);
     expect(authMsg.type).toBe("authenticate");
     expect(authMsg.token).toBe("gw_test123");
-    expect(authMsg.protocolVersion).toBe(2);
+    expect(authMsg.protocolVersion).toBe(3);
 
     // Service responds with authenticated
     authenticate(ws);

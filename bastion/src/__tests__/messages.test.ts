@@ -25,7 +25,7 @@ describe("Bastion -> Service messages", () => {
       type: "authenticate",
       token: "gw_abc123",
       protocolVersion: 2,
-      gatewayVersion: "0.1.0",
+      bastionVersion: "0.1.0",
     };
     expect(AuthenticateMessageSchema.parse(msg)).toEqual(msg);
   });
@@ -171,7 +171,7 @@ describe("Bastion -> Service messages", () => {
         type: "authenticate",
         token: "gw_test",
         protocolVersion: 2,
-        gatewayVersion: "0.1.0",
+        bastionVersion: "0.1.0",
       },
       {
         type: "tool_result",
@@ -199,7 +199,7 @@ describe("Bastion -> Service messages", () => {
     const msg = {
       type: "authenticate",
       protocolVersion: 2,
-      gatewayVersion: "0.1.0",
+      bastionVersion: "0.1.0",
     };
     expect(() => AuthenticateMessageSchema.parse(msg)).toThrow();
   });

@@ -15,7 +15,7 @@ function connectAndAuth(
           type: "authenticate",
           token,
           protocolVersion: 2,
-          gatewayVersion: "0.1.0-test",
+          bastionVersion: "0.1.0-test",
         })
       );
     });
@@ -124,7 +124,7 @@ describe("BastionServer", () => {
     await sendVersionChanged(ws, []);
     expect(server.connectedBastions).toHaveLength(1);
     expect(server.connectedBastions[0].protocolVersion).toBe(2);
-    expect(server.connectedBastions[0].gatewayVersion).toBe("0.1.0-test");
+    expect(server.connectedBastions[0].bastionVersion).toBe("0.1.0-test");
     ws.close();
   });
 
@@ -157,7 +157,7 @@ describe("BastionServer", () => {
       type: "authenticate",
       token: "gw_valid",
       protocolVersion: 2,
-      gatewayVersion: "0.1.0-test",
+      bastionVersion: "0.1.0-test",
     }));
 
     await waitForClose(ws);
