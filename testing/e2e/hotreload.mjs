@@ -1,5 +1,5 @@
-// Config hot-reload E2E: start the gateway with an empty config, then write a
-// Postgres MCP server into the config file on disk and assert the gateway picks
+// Config hot-reload E2E: start the bastion with an empty config, then write a
+// Postgres MCP server into the config file on disk and assert the bastion picks
 // it up at runtime and republishes tools to the service — no restart.
 //
 //   node hotreload.mjs
@@ -11,11 +11,11 @@ import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { GatewayServer } from "../../clients/typescript/dist/server.js";
+import { BastionServer } from "../../src/hub/dist/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
-const GATEWAY_BIN = path.join(REPO, "gateway", "dist", "main.js");
+const BASTION_BIN = path.join(REPO, "bastion", "dist", "main.js");
 const TOKEN = "gw_e2e";
 
 const log = (...a) => console.log("[hotreload]", ...a);
@@ -38,7 +38,7 @@ function deadline(ms, label) {
 }
 
 const tmp = mkdtempSync(path.join(tmpdir(), "jg-hotreload-"));
-const configPath = path.join(tmp, "gateway.json");
+const configPath = path.join(tmp, "bastion.json");
 writeFileSync(configPath, JSON.stringify({ mcpServers: [] }));
 
 const POSTGRES_SERVER = {
@@ -55,7 +55,7 @@ const POSTGRES_SERVER = {
   },
 };
 
-const server = new GatewayServer({
+const server = new BastionServer({
   port: 8080,
   pingIntervalMs: 0,
   validateToken: async (t) => (t === TOKEN ? { organizationId: "org_e2e" } : null),
@@ -65,23 +65,23 @@ let proc;
 try {
   await server.start();
   let updates = 0;
-  server.onGatewayUpdated = () => {
+  server.onBastionUpdated = () => {
     updates++;
   };
 
-  const connected = new Promise((r) => (server.onGatewayConnected = r));
+  const connected = new Promise((r) => (server.onBastionConnected = r));
   proc = spawn(
     "node",
-    [GATEWAY_BIN, "--config", configPath],
+    [BASTION_BIN, "--config", configPath],
     {
       env: {
         ...process.env,
-        JOURNAL_GATEWAY_TOKEN: TOKEN,
-        JOURNAL_GATEWAY_URL: server.url,
+        JOURNAL_BASTION_TOKEN: TOKEN,
+        JOURNAL_BASTION_URL: server.url,
         POSTGRES_HOST: "127.0.0.1",
         POSTGRES_PORT: "5433",
         POSTGRES_DATABASE: "analytics",
-        POSTGRES_USER: "journal_gateway_ro",
+        POSTGRES_USER: "journal_bastion_ro",
         POSTGRES_PASSWORD: "ro_pw",
         LOG_LEVEL: "warn",
       },
@@ -89,7 +89,7 @@ try {
     }
   );
 
-  const gw = await Promise.race([connected, deadline(30_000, "gateway connect")]);
+  const gw = await Promise.race([connected, deadline(30_000, "bastion connect")]);
   log(`connected id=${gw.id}, initial integrations=${gw.integrations.length} (expect 0)`);
   if (gw.integrations.length !== 0) { ok = false; log("FAIL: expected 0 integrations at start"); }
 
@@ -98,14 +98,14 @@ try {
 
   const updated = await waitFor(
     () => {
-      const g = server.connectedGateways.find((c) => c.id === gw.id);
+      const g = server.connectedBastions.find((c) => c.id === gw.id);
       return g && g.integrations.some((i) => i.id === "postgres") ? g : null;
     },
     60_000,
     "postgres integration to appear after hot-reload"
   );
   const pg = updated.integrations.find((i) => i.id === "postgres");
-  log(`hot-reload picked up postgres: ${pg.tools.length} tools, onGatewayUpdated fired ${updates}x`);
+  log(`hot-reload picked up postgres: ${pg.tools.length} tools, onBastionUpdated fired ${updates}x`);
   if (!pg.tools.some((t) => t.name === "execute_sql")) { ok = false; log("FAIL: execute_sql not present after reload"); }
 
   // Prove the newly added server is actually callable

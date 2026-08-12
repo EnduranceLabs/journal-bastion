@@ -2,9 +2,10 @@
 set -euo pipefail
 
 TAP_REPO="${TAP_REPO:-EnduranceLabs/homebrew-tap}"
-FORMULA="packaging/homebrew/journal-gateway.rb"
-VERSION="${VERSION:-$(node -p "require('./gateway/package.json').version")}"
-TARBALL_URL="https://registry.npmjs.org/journal-gateway/-/journal-gateway-${VERSION}.tgz"
+FORMULA="packaging/homebrew/journal-bastion.rb"
+VERSION="${VERSION:-$(node -p "require('./bastion/package.json').version")}"
+# Scoped packages keep the scope in the path but drop it from the filename.
+TARBALL_URL="https://registry.npmjs.org/@journal/bastion/-/bastion-${VERSION}.tgz"
 
 echo "Downloading tarball to compute sha256..."
 SHA256=$(curl -fsSL "${TARBALL_URL}" | shasum -a 256 | cut -d' ' -f1)

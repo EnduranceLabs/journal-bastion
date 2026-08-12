@@ -1,4 +1,4 @@
-# Databases for Journal Gateway end-to-end tests.
+# Databases for Journal Bastion end-to-end tests.
 # Non-default host ports (5433/3307) avoid clashing with any local DB.
 #
 #   docker compose -f testing/e2e/docker-compose.yml up -d

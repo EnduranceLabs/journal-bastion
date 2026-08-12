@@ -4,10 +4,10 @@ import subprocess
 
 import pytest_asyncio
 
-from journal_gateway_client import GatewayServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
-GATEWAY_BIN = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "gateway", "dist", "main.js"
+BASTION_BIN = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "bastion", "dist", "main.js"
 )
 
 
@@ -18,27 +18,27 @@ async def _validate_token(token: str) -> TokenValidationResult | None:
 
 
 @pytest_asyncio.fixture
-async def server_and_gateway():
-    """Start Python client server + real TS gateway."""
-    server = GatewayServer(validate_token=_validate_token, port=0, ping_interval=0)
+async def server_and_bastion():
+    """Start Python client server + real TS bastion."""
+    server = BastionServer(validate_token=_validate_token, port=0, ping_interval=0)
     await server.start()
 
     proc = subprocess.Popen(
-        ["node", GATEWAY_BIN],
+        ["node", BASTION_BIN],
         env={
             **os.environ,
-            "JOURNAL_GATEWAY_TOKEN": "gw_test",
-            "JOURNAL_GATEWAY_URL": server.url,
-            "JOURNAL_GATEWAY_CONFIG": "{}",
+            "JOURNAL_BASTION_TOKEN": "gw_test",
+            "JOURNAL_BASTION_URL": server.url,
+            "JOURNAL_BASTION_CONFIG": "{}",
             "LOG_LEVEL": "error",
         },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
 
-    # Wait for gateway to connect (up to 10s)
+    # Wait for bastion to connect (up to 10s)
     for _ in range(100):
-        if server.connected_gateways:
+        if server.connected_bastions:
             break
         await asyncio.sleep(0.1)
 

@@ -5,11 +5,11 @@ WORKDIR /app
 FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter=journal-gateway-protocol --filter=journal-gateway build
-RUN pnpm --filter=journal-gateway deploy --prod --legacy /prod/gateway
+RUN pnpm --filter=journal-bastion-protocol --filter=journal-bastion build
+RUN pnpm --filter=journal-bastion deploy --prod --legacy /prod/bastion
 
 FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /app
-COPY --from=build /prod/gateway ./
+COPY --from=build /prod/bastion ./
 ENTRYPOINT ["node", "dist/main.js"]

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EnduranceLabs/journal-bastion/main/spec/bastion-config.schema.json",
+  "mcpServers": [
+    {
+      "id": "postgresql",
+      "command": "npx",
+      "args": ["-y", "@toolbox-sdk/server", "--prebuilt", "postgres", "--stdio"],
+      "name": "PostgreSQL",
+      "description": "Query the analytics database",
+      "envVars": {
+        "POSTGRES_HOST": "POSTGRES_HOST",
+        "POSTGRES_PORT": "POSTGRES_PORT",
+        "POSTGRES_DATABASE": "POSTGRES_DATABASE",
+        "POSTGRES_USER": "POSTGRES_USER",
+        "POSTGRES_PASSWORD": "POSTGRES_PASSWORD"
+      }
+    },
+    {
+      "id": "remote-api",
+      "transport": "streamable-http",
+      "url": "https://mcp.example.com/mcp",
+      "name": "Remote API",
+      "description": "Remote MCP server",
+      "headers": { "Authorization": "REMOTE_MCP_AUTHORIZATION" }
+    }
+  ],
+  "skillsDir": "./skills"
+}

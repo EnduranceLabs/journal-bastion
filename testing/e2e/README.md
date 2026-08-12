@@ -1,21 +1,21 @@
 # End-to-End Tests
 
-These tests exercise the **real** Journal Gateway stack against **real**
+These tests exercise the **real** Journal Bastion stack against **real**
 databases — no mocks:
 
 ```
-client library (service side)  <—ws—>  journal-gateway  <—stdio—>  Toolbox MCP server  <—>  Postgres / MySQL (Docker)
+client library (service side)  <—ws—>  journal-bastion  <—stdio—>  Toolbox MCP server  <—>  Postgres / MySQL (Docker)
 ```
 
 They validate the database integration examples under
-[`examples/integrations/`](../../examples/integrations) plus the gateway's
+[`examples/integrations/`](../../examples/integrations) plus the bastion's
 config hot-reload.
 
 ## What is covered
 
 | Test | What it proves |
 |------|----------------|
-| `driver.mjs` (postgres) | Gateway starts the Toolbox Postgres MCP server over stdio, publishes `execute_sql` (+28 tools) to the client, read queries return rows, writes are rejected by the read-only role. |
+| `driver.mjs` (postgres) | Bastion starts the Toolbox Postgres MCP server over stdio, publishes `execute_sql` (+28 tools) to the client, read queries return rows, writes are rejected by the read-only role. |
 | `driver.mjs` (mysql) | Same, for MySQL (writes rejected with `ERROR 1142 command denied`). |
 | `hotreload.mjs` | Adding an MCP server to the config file on disk at runtime republishes tools with no restart, and the new server is immediately callable. |
 | `sql/*-setup.sql` | The exact read-only role recipes from [`examples/integrations/database/README.md`](../../examples/integrations/database/README.md): reads succeed, writes fail. |
@@ -29,7 +29,7 @@ env-var tables are correct.
 - Docker (Compose v2)
 - Node.js >= 22
 - Workspace dependencies installed and packages built (the drivers import the
-  gateway and client `dist/` output):
+  bastion and client `dist/` output):
   ```bash
   pnpm install
   pnpm -r build
@@ -64,22 +64,22 @@ docker compose -f testing/e2e/docker-compose.yml down -v
 
 ## Shipped example scripts
 
-The shipped `examples/client-server.ts` / `examples/client_server.py` +
-`examples/gateway.json` were also run by hand against this Postgres. To repeat:
+The shipped `examples/hub-server.ts` / `examples/hub_server.py` +
+`examples/bastion.json` were also run by hand against this Postgres. To repeat:
 
 ```bash
 # make the workspace client resolvable to the TS example (mimics `npm install`)
 mkdir -p examples/node_modules
-ln -sfn ../../clients/typescript examples/node_modules/journal-gateway-client
+ln -sfn ../../hub/typescript examples/node_modules/@journal/bastion
 
 # TS (node 22 strips the types; no tsx needed)
-( cd examples && node --experimental-strip-types client-server.ts ) &
-JOURNAL_GATEWAY_TOKEN=gw_demo node gateway/dist/main.js \
-  --env-file testing/e2e/env/examples-postgres.env --config examples/gateway.json
+( cd examples && node --experimental-strip-types hub-server.ts ) &
+JOURNAL_BASTION_TOKEN=gw_demo node dist/cli/main.js \
+  --env-file testing/e2e/env/examples-postgres.env --config examples/bastion.json
 ```
 
-The `remote-api` entry in `gateway.json` points at a non-existent host on
-purpose — it demonstrates the gateway's resilient startup (the failed server is
+The `remote-api` entry in `bastion.json` points at a non-existent host on
+purpose — it demonstrates the bastion's resilient startup (the failed server is
 logged and skipped, the healthy ones still serve).
 
 ## Files
@@ -88,8 +88,8 @@ logged and skipped, the healthy ones still serve).
 docker-compose.yml     Postgres (host :5433) + MySQL (host :3307)
 sql/postgres-setup.sql Fixture data + read-only role (from the docs)
 sql/mysql-setup.sql    Fixture data + read-only user (from the docs)
-configs/*.json         Gateway configs (Toolbox stdio) for each DB
-env/*.env              Host env vars the gateway maps into the MCP subprocess
+configs/*.json         Bastion configs (Toolbox stdio) for each DB
+env/*.env              Host env vars the bastion maps into the MCP subprocess
 driver.mjs             DB integration driver (asserts read ok / write rejected)
 hotreload.mjs          Config hot-reload driver
 run-all.sh             One-shot runner

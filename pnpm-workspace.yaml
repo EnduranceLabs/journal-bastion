@@ -1,5 +1,2 @@
 packages:
-  - protocol
-  - gateway
-  - clients/typescript
   - testing/integration/ts

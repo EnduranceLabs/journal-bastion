@@ -7,10 +7,10 @@ import pytest
 import pytest_asyncio
 import websockets
 
-from journal_gateway_client import (
-    GatewayServer,
+from journal_bastion_hub import (
+    BastionServer,
     TokenValidationResult,
-    ConnectedGateway,
+    ConnectedBastion,
 )
 
 
@@ -30,7 +30,7 @@ async def _validate_token(token: str) -> TokenValidationResult | None:
 
 @pytest_asyncio.fixture
 async def server():
-    srv = GatewayServer(
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0,
@@ -41,13 +41,13 @@ async def server():
 
 
 async def connect_and_auth(url: str, token: str) -> websockets.asyncio.client.ClientConnection:
-    """Connect a mock gateway and authenticate."""
+    """Connect a mock bastion and authenticate."""
     ws = await websockets.connect(url, ping_interval=None, ping_timeout=None)
     await ws.send(json.dumps({
         "type": "authenticate",
         "token": token,
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
     raw = await ws.recv()
     msg = json.loads(raw)
@@ -120,24 +120,24 @@ TEST_INTEGRATION = {
 
 
 @pytest.mark.asyncio
-async def test_accepts_valid_token(server: GatewayServer):
+async def test_accepts_valid_token(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws)
-    assert len(server.connected_gateways) == 1
-    assert server.connected_gateways[0].organization_id == "org_1"
-    assert server.connected_gateways[0].protocol_version == 2
-    assert server.connected_gateways[0].gateway_version == "0.1.0-test"
+    assert len(server.connected_bastions) == 1
+    assert server.connected_bastions[0].organization_id == "org_1"
+    assert server.connected_bastions[0].protocol_version == 2
+    assert server.connected_bastions[0].bastion_version == "0.1.0-test"
     await ws.close()
 
 
 @pytest.mark.asyncio
-async def test_rejects_invalid_token(server: GatewayServer):
+async def test_rejects_invalid_token(server: BastionServer):
     with pytest.raises(RuntimeError, match="Auth failed"):
         await connect_and_auth(server.url, "gw_invalid")
 
 
 @pytest.mark.asyncio
-async def test_call_tool_returns_result(server: GatewayServer):
+async def test_call_tool_returns_result(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -167,7 +167,7 @@ async def test_call_tool_returns_result(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_call_tool_returns_error(server: GatewayServer):
+async def test_call_tool_returns_error(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -194,28 +194,28 @@ async def test_call_tool_returns_error(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_call_tool_no_gateway(server: GatewayServer):
-    with pytest.raises(LookupError, match="No gateway has integration"):
+async def test_call_tool_no_bastion(server: BastionServer):
+    with pytest.raises(LookupError, match="No bastion has integration"):
         await server.call_tool("nonexistent", "tool", {})
 
 
 @pytest.mark.asyncio
-async def test_disconnection_fires_callback(server: GatewayServer):
-    disconnected: list[ConnectedGateway] = []
-    server.on_gateway_disconnected = lambda gw: disconnected.append(gw)
+async def test_disconnection_fires_callback(server: BastionServer):
+    disconnected: list[ConnectedBastion] = []
+    server.on_bastion_disconnected = lambda gw: disconnected.append(gw)
 
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws)
-    assert len(server.connected_gateways) == 1
+    assert len(server.connected_bastions) == 1
 
     await ws.close()
     await asyncio.sleep(0.1)
     assert len(disconnected) == 1
-    assert len(server.connected_gateways) == 0
+    assert len(server.connected_bastions) == 0
 
 
 @pytest.mark.asyncio
-async def test_concurrent_tool_calls(server: GatewayServer):
+async def test_concurrent_tool_calls(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -252,7 +252,7 @@ async def test_concurrent_tool_calls(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_available_tools(server: GatewayServer):
+async def test_available_tools(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -264,9 +264,9 @@ async def test_available_tools(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_version_changed_triggers_auto_pull(server: GatewayServer):
-    connected: list[ConnectedGateway] = []
-    server.on_gateway_connected = lambda gw: connected.append(gw)
+async def test_version_changed_triggers_auto_pull(server: BastionServer):
+    connected: list[ConnectedBastion] = []
+    server.on_bastion_connected = lambda gw: connected.append(gw)
 
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION], mcp_version="v1")
@@ -279,9 +279,9 @@ async def test_version_changed_triggers_auto_pull(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_subsequent_version_changed_fires_updated(server: GatewayServer):
-    updated_gateways: list[ConnectedGateway] = []
-    server.on_gateway_updated = lambda gw: updated_gateways.append(gw)
+async def test_subsequent_version_changed_fires_updated(server: BastionServer):
+    updated_bastions: list[ConnectedBastion] = []
+    server.on_bastion_updated = lambda gw: updated_bastions.append(gw)
 
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION], mcp_version="v1")
@@ -295,47 +295,47 @@ async def test_subsequent_version_changed_fires_updated(server: GatewayServer):
     }
     await send_version_changed(ws, [updated_integration], mcp_version="v2")
 
-    assert len(updated_gateways) == 1
-    gw = server.connected_gateways[0]
+    assert len(updated_bastions) == 1
+    gw = server.connected_bastions[0]
     assert len(gw.integrations[0].tools) == 3
     assert gw.mcp_version == "v2"
     await ws.close()
 
 
 @pytest.mark.asyncio
-async def test_has_gateway_for_org(server: GatewayServer):
+async def test_has_bastion_for_org(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws)
 
-    assert server.has_gateway_for_org("org_1") is True
-    assert server.has_gateway_for_org("org_nonexistent") is False
+    assert server.has_bastion_for_org("org_1") is True
+    assert server.has_bastion_for_org("org_nonexistent") is False
     await ws.close()
 
 
 @pytest.mark.asyncio
-async def test_get_gateways_for_org(server: GatewayServer):
+async def test_get_bastions_for_org(server: BastionServer):
     ws1 = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws1, [TEST_INTEGRATION])
 
     ws2 = await connect_and_auth(server.url, "gw_org2")
     await send_version_changed(ws2, [TEST_INTEGRATION])
 
-    org1_gateways = server.get_gateways_for_org("org_1")
-    assert len(org1_gateways) == 1
-    assert org1_gateways[0].organization_id == "org_1"
+    org1_bastions = server.get_bastions_for_org("org_1")
+    assert len(org1_bastions) == 1
+    assert org1_bastions[0].organization_id == "org_1"
 
-    org2_gateways = server.get_gateways_for_org("org_2")
-    assert len(org2_gateways) == 1
-    assert org2_gateways[0].organization_id == "org_2"
+    org2_bastions = server.get_bastions_for_org("org_2")
+    assert len(org2_bastions) == 1
+    assert org2_bastions[0].organization_id == "org_2"
 
-    assert server.get_gateways_for_org("org_nonexistent") == []
+    assert server.get_bastions_for_org("org_nonexistent") == []
 
     await ws1.close()
     await ws2.close()
 
 
 @pytest.mark.asyncio
-async def test_get_tools_for_org(server: GatewayServer):
+async def test_get_tools_for_org(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -350,8 +350,8 @@ async def test_get_tools_for_org(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_get_tools_for_org_deduplicates(server: GatewayServer):
-    """Two gateways for the same org with the same integration should deduplicate tools."""
+async def test_get_tools_for_org_deduplicates(server: BastionServer):
+    """Two bastions for the same org with the same integration should deduplicate tools."""
     ws1 = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws1, [TEST_INTEGRATION])
 
@@ -365,7 +365,7 @@ async def test_get_tools_for_org_deduplicates(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_call_tool_for_org(server: GatewayServer):
+async def test_call_tool_for_org(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION])
 
@@ -391,37 +391,37 @@ async def test_call_tool_for_org(server: GatewayServer):
 
 
 @pytest.mark.asyncio
-async def test_call_tool_for_org_no_match(server: GatewayServer):
-    with pytest.raises(LookupError, match="No gateway for org"):
+async def test_call_tool_for_org_no_match(server: BastionServer):
+    with pytest.raises(LookupError, match="No bastion for org"):
         await server.call_tool_for_org("org_nonexistent", "test-integration", "echo", {})
 
 
 @pytest.mark.asyncio
-async def test_connected_gateway_has_version_fields(server: GatewayServer):
+async def test_connected_bastion_has_version_fields(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws, [TEST_INTEGRATION], mcp_version="abc123", skills_version="def456",
                                skills=[{"id": "review", "content": "Review PR..."}])
 
-    gw = server.connected_gateways[0]
+    gw = server.connected_bastions[0]
     assert gw.mcp_version == "abc123"
     assert gw.skills_version == "def456"
     await ws.close()
 
 
 @pytest.mark.asyncio
-async def test_connected_gateway_null_versions_by_default(server: GatewayServer):
+async def test_connected_bastion_null_versions_by_default(server: BastionServer):
     ws = await connect_and_auth(server.url, "gw_valid")
     await send_version_changed(ws)
-    gw = server.connected_gateways[0]
+    gw = server.connected_bastions[0]
     assert gw.mcp_version is None
     assert gw.skills_version is None
     await ws.close()
 
 
 @pytest.mark.asyncio
-async def test_pong_timeout_disconnects_gateway():
-    """Gateway that doesn't respond to pings should be disconnected."""
-    srv = GatewayServer(
+async def test_pong_timeout_disconnects_bastion():
+    """Bastion that doesn't respond to pings should be disconnected."""
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0.1,
@@ -429,8 +429,8 @@ async def test_pong_timeout_disconnects_gateway():
     )
     await srv.start()
 
-    disconnected: list[ConnectedGateway] = []
-    srv.on_gateway_disconnected = lambda gw: disconnected.append(gw)
+    disconnected: list[ConnectedBastion] = []
+    srv.on_bastion_disconnected = lambda gw: disconnected.append(gw)
 
     # Connect but never respond to pings
     ws = await websockets.connect(srv.url, ping_interval=None, ping_timeout=None)
@@ -438,7 +438,7 @@ async def test_pong_timeout_disconnects_gateway():
         "type": "authenticate",
         "token": "gw_valid",
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
     msg = json.loads(await ws.recv())
     assert msg["type"] == "authenticated"
@@ -449,14 +449,14 @@ async def test_pong_timeout_disconnects_gateway():
         "skillsVersion": None,
     }))
 
-    # Wait for the gateway to be connected
+    # Wait for the bastion to be connected
     await asyncio.sleep(0.1)
-    assert len(srv.connected_gateways) == 1
+    assert len(srv.connected_bastions) == 1
 
     # Wait for ping + pong timeout to fire
     await asyncio.sleep(0.5)
 
-    assert len(srv.connected_gateways) == 0
+    assert len(srv.connected_bastions) == 0
     assert len(disconnected) == 1
 
     await srv.stop()
@@ -465,7 +465,7 @@ async def test_pong_timeout_disconnects_gateway():
 @pytest.mark.asyncio
 async def test_get_trace_context_propagates_to_tool_call():
     """traceparent/tracestate from get_trace_context ride on the tool_call."""
-    srv = GatewayServer(
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0,
@@ -505,9 +505,9 @@ async def test_get_trace_context_propagates_to_tool_call():
 
 @pytest.mark.asyncio
 async def test_on_socket_error_fires_on_abnormal_close():
-    """A gateway socket that drops abruptly surfaces via on_socket_error."""
+    """A bastion socket that drops abruptly surfaces via on_socket_error."""
     errors: list[tuple] = []
-    srv = GatewayServer(
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0,
@@ -517,7 +517,7 @@ async def test_on_socket_error_fires_on_abnormal_close():
 
     ws = await connect_and_auth(srv.url, "gw_valid")
     await send_version_changed(ws)
-    assert len(srv.connected_gateways) == 1
+    assert len(srv.connected_bastions) == 1
 
     # Abrupt transport failure (not a clean close handshake).
     ws.transport.close()
@@ -536,7 +536,7 @@ async def test_on_socket_error_fires_on_token_validator_failure():
         raise RuntimeError("token validator unavailable")
 
     errors: list[tuple] = []
-    srv = GatewayServer(
+    srv = BastionServer(
         validate_token=fail_validation,
         port=0,
         ping_interval=0,
@@ -549,7 +549,7 @@ async def test_on_socket_error_fires_on_token_validator_failure():
         "type": "authenticate",
         "token": "gw_valid",
         "protocolVersion": 2,
-        "gatewayVersion": "0.1.0-test",
+        "bastionVersion": "0.1.0-test",
     }))
 
     with pytest.raises(websockets.exceptions.ConnectionClosed):
@@ -566,17 +566,17 @@ async def test_on_socket_error_fires_on_token_validator_failure():
 @pytest.mark.asyncio
 async def test_on_socket_error_fires_on_background_callback_failure():
     errors: list[tuple] = []
-    srv = GatewayServer(
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0,
         on_socket_error=lambda err, gw: errors.append((err, gw)),
     )
 
-    def fail_connected(gw: ConnectedGateway) -> None:
+    def fail_connected(gw: ConnectedBastion) -> None:
         raise RuntimeError("connected callback failed")
 
-    srv.on_gateway_connected = fail_connected
+    srv.on_bastion_connected = fail_connected
     await srv.start()
 
     ws = await connect_and_auth(srv.url, "gw_valid")
@@ -601,25 +601,25 @@ async def test_on_socket_error_fires_on_background_callback_failure():
 async def test_on_socket_error_ignores_protocol_handler_errors():
     """Protocol/handler bugs should not be reported as socket failures."""
     errors: list[tuple] = []
-    disconnected: list[ConnectedGateway] = []
-    srv = GatewayServer(
+    disconnected: list[ConnectedBastion] = []
+    srv = BastionServer(
         validate_token=_validate_token,
         port=0,
         ping_interval=0,
         on_socket_error=lambda err, gw: errors.append((err, gw)),
     )
-    srv.on_gateway_disconnected = lambda gw: disconnected.append(gw)
+    srv.on_bastion_disconnected = lambda gw: disconnected.append(gw)
     await srv.start()
 
     ws = await connect_and_auth(srv.url, "gw_valid")
     await send_version_changed(ws)
-    assert len(srv.connected_gateways) == 1
+    assert len(srv.connected_bastions) == 1
 
     await ws.send("not-json")
     await asyncio.sleep(0.1)
 
     assert errors == []
     assert len(disconnected) == 1
-    assert len(srv.connected_gateways) == 0
+    assert len(srv.connected_bastions) == 0
 
     await srv.stop()
