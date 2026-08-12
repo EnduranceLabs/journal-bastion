@@ -1,6 +1,6 @@
 # journal-bastion-hub
 
-[![PyPI](https://img.shields.io/pypi/v/journal-bastion-hub)](https://pypi.org/project/journal-bastion-hub/)
+**Not published.** Install from source; there is no PyPI release.
 
 Python service-side library for the Journal Bastion protocol. Use this package
 in the service that accepts bastion WebSocket connections, validates bastion
@@ -14,7 +14,7 @@ If you want to run the customer-side bastion process, install the npm package
 Requires Python 3.11 or newer.
 
 ```bash
-pip install journal-bastion-hub
+pip install -e clients/python
 ```
 
 ## Quick Start
@@ -138,7 +138,7 @@ is sent to the bastion and used as the parent for remote tool execution spans.
 Journal Bastion packages release in lockstep. Use matching versions of:
 
 - npm `journal-bastion`
-- npm `journal-bastion-hub` for TypeScript services
+- npm `@journal/bastion` (import `@journal/bastion/hub`) for TypeScript services
 - 
 - the unpublished Python client in `clients/python`
 

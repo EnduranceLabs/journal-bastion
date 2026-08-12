@@ -70,7 +70,7 @@ The shipped `examples/hub-server.ts` / `examples/hub_server.py` +
 ```bash
 # make the workspace client resolvable to the TS example (mimics `npm install`)
 mkdir -p examples/node_modules
-ln -sfn ../../hub/typescript examples/node_modules/@journal/journal-bastion
+ln -sfn ../../hub/typescript examples/node_modules/@journal/bastion
 
 # TS (node 22 strips the types; no tsx needed)
 ( cd examples && node --experimental-strip-types hub-server.ts ) &

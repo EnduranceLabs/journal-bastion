@@ -20,7 +20,7 @@ inbound ports.
 Requires Node.js 22 or newer.
 
 ```bash
-npm install -g @journal/journal-bastion
+npm install -g @journal/bastion
 journal-bastion --version
 ```
 

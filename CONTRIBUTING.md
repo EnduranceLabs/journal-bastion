@@ -71,10 +71,10 @@ callbacks such as `onSocketError` / `on_socket_error`.
 +-------------+        +------------------+        +-----------+
 ```
 
-### TypeScript (`@journal/journal-bastion`)
+### TypeScript (`@journal/bastion`)
 
 ```typescript
-import { BastionServer } from "@journal/journal-bastion/hub";
+import { BastionServer } from "@journal/bastion/hub";
 
 const server = new BastionServer({
   port: 8080,
@@ -91,7 +91,7 @@ console.log(result.content);
 await server.stop();
 ```
 
-### Python (`@journal/journal-bastion`)
+### Python (`@journal/bastion`)
 
 ```python
 from journal_bastion_hub import BastionServer, TokenValidationResult
@@ -124,7 +124,7 @@ The bastion communicates with Journal over WebSocket using a simple JSON protoco
 
 ## Packaging
 
-One publishable package, `@journal/journal-bastion`, carrying the CLI (`.`), the hub
+One publishable package, `@journal/bastion`, carrying the CLI (`.`), the hub
 library (`./hub`) and the wire schemas (`./protocol`) as subpath exports. Set the version
 with `packaging/bump-version.sh` — never edit it by hand. See
 [packaging/npm/README.md](./packaging/npm/README.md) for the release runbook.

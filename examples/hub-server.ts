@@ -1,6 +1,6 @@
 // Minimal Journal Bastion client server (TypeScript).
 //
-//   npm install @journal/journal-bastion
+//   npm install @journal/bastion
 //   npx tsx hub-server.ts
 //
 // Then point a bastion at ws://localhost:8080 with token "gw_demo":
@@ -8,7 +8,7 @@
 //   JOURNAL_BASTION_URL=ws://localhost:8080 \
 //   journal-bastion --config bastion.json
 
-import { BastionServer } from "@journal/journal-bastion/hub";
+import { BastionServer } from "@journal/bastion/hub";
 
 const server = new BastionServer({
   port: 8080,

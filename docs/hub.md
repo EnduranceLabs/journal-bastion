@@ -1,4 +1,4 @@
-# @journal/journal-bastion
+# @journal/bastion
 
 TypeScript service-side library for the Journal Bastion protocol. Use this
 package in the service that accepts bastion WebSocket connections, validates
@@ -13,13 +13,13 @@ If you want to run the customer-side bastion process, install
 Requires Node.js 22 or newer.
 
 ```bash
-npm install @journal/journal-bastion
+npm install @journal/bastion
 ```
 
 ## Quick Start
 
 ```ts
-import { BastionServer } from "@journal/journal-bastion/hub";
+import { BastionServer } from "@journal/bastion/hub";
 
 const server = new BastionServer({
   port: 8080,

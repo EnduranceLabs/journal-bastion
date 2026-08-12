@@ -67,12 +67,12 @@ The Docker database end-to-end tests are separate from `pnpm test:all`.
 
 ## Versioning & releases
 
-One publishable package, `@journal/journal-bastion`, so there is one version and nothing
+One publishable package, `@journal/bastion`, so there is one version and nothing
 to keep in lockstep. The CLI, the hub library and the wire schemas ship inside it as the
 `.`, `./hub` and `./protocol` subpath exports. Never edit the version by hand:
 
 ```bash
-./packaging/bump-version.sh 0.9.0
+./packaging/bump-version.sh 0.1.0
 ```
 
 The Python client in `clients/python` is not published; it tracks the same version only

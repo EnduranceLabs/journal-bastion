@@ -7,8 +7,8 @@ Runnable starting points for the two sides of the Journal Bastion protocol.
 | [`bastion.json`](./bastion.json) | Sample bastion config (stdio + streamable-http servers, a skills dir). The `$schema` line gives you autocomplete and validation in editors like VS Code. |
 | [`bastion.env.example`](./bastion.env.example) | Environment variables required by `bastion.json`. |
 | [`integrations/`](./integrations) | Customer-facing MCP integration examples, including SQL database configs and a curated enterprise MCP server catalog. |
-| [`hub-server.ts`](./hub-server.ts) | Minimal service-side server using `@journal/journal-bastion`. |
-| [`hub_server.py`](./hub_server.py) | The same, using `@journal/journal-bastion`. |
+| [`hub-server.ts`](./hub-server.ts) | Minimal service-side server using `@journal/bastion`. |
+| [`hub_server.py`](./hub_server.py) | The same, using `@journal/bastion`. |
 
 ## Try it end to end
 
@@ -16,11 +16,11 @@ Runnable starting points for the two sides of the Journal Bastion protocol.
 
    ```bash
    # TypeScript
-   npm install @journal/journal-bastion
+   npm install @journal/bastion
    npx tsx hub-server.ts
 
    # or Python
-   pip install @journal/journal-bastion
+   pip install @journal/bastion
    python hub_server.py
    ```
 
@@ -30,7 +30,7 @@ Runnable starting points for the two sides of the Journal Bastion protocol.
    database/API values for your environment, then:
 
    ```bash
-   npm install -g @journal/journal-bastion
+   npm install -g @journal/bastion
 
    journal-bastion --env-file .env --config bastion.json
    ```
