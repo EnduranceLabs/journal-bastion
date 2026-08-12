@@ -70,11 +70,11 @@ The shipped `examples/hub-server.ts` / `examples/hub_server.py` +
 ```bash
 # make the workspace client resolvable to the TS example (mimics `npm install`)
 mkdir -p examples/node_modules
-ln -sfn ../../hub/typescript examples/node_modules/journal-bastion-hub
+ln -sfn ../../hub/typescript examples/node_modules/@journal/journal-bastion
 
 # TS (node 22 strips the types; no tsx needed)
 ( cd examples && node --experimental-strip-types hub-server.ts ) &
-JOURNAL_BASTION_TOKEN=gw_demo node bastion/dist/main.js \
+JOURNAL_BASTION_TOKEN=gw_demo node dist/cli/main.js \
   --env-file testing/e2e/env/examples-postgres.env --config examples/bastion.json
 ```
 

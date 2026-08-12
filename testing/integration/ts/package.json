@@ -5,7 +5,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "journal-bastion-hub": "workspace:*"
+    "@journal/journal-bastion": "link:../../.."
   },
   "devDependencies": {
     "@types/node": "^22",

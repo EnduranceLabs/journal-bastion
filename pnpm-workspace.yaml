@@ -1,5 +1,2 @@
 packages:
-  - protocol
-  - bastion
-  - hub/typescript
   - testing/integration/ts

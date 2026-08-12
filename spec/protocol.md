@@ -347,7 +347,7 @@ Heartbeat sent by the service.
 
 ## Data Types
 
-The canonical definitions live in `protocol/src/` as Zod schemas. The tables below are a prose summary for implementors working in other languages.
+The canonical definitions live in `src/protocol/` as Zod schemas. The tables below are a prose summary for implementors working in other languages.
 
 ### Integration
 

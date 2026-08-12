@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { BastionServer } from "journal-bastion-hub";
+import { BastionServer } from "@journal/journal-bastion/hub";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BASTION_BIN = path.resolve(__dirname, "../../../bastion/dist/main.js");
+const BASTION_BIN = path.resolve(__dirname, "../../../dist/cli/main.js");
 
 function waitForBastion(
   server: BastionServer,

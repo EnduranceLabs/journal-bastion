@@ -18,7 +18,7 @@ All commands run from the repository root:
 pnpm build            # build protocol and bastion
 pnpm typecheck        # protocol, bastion, and TS client
 pnpm test             # bastion tests
-pnpm test:hub      # TypeScript client tests
+pnpm test      # TypeScript client tests
 pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 pnpm test:all         # root-script suites above
@@ -32,8 +32,8 @@ See `ARCHITECTURE.md`.
 ## Key Source Files
 
 See `ARCHITECTURE.md` for the current module list. For protocol message work,
-start with `protocol/src/messages.ts`, `protocol/src/index.ts`,
-`spec/protocol.md`, and `bastion/src/__tests__/messages.test.ts`.
+start with `src/protocol/messages.ts`, `src/protocol/index.ts`,
+`spec/protocol.md`, and `src/cli/__tests__/messages.test.ts`.
 
 ## Testing Patterns
 

@@ -10,7 +10,7 @@ two sides of one WebSocket protocol:
 - **Bastion** (`bastion/`) — runs inside the customer's network, connects *outbound* to
   Journal, and exposes their MCP servers and skill files. Credentials never leave their
   infrastructure and no inbound ports are opened.
-- **Client libraries** (`hub/typescript`, `hub/python`) — the service side that
+- **Hub library** (`src/hub`, plus the unpublished `clients/python`) — the service side that
   accepts bastion connections, pulls their tools/skills, and calls tools.
 
 Both sides share the schemas in `protocol/`. It is a pnpm workspace; the Python client
@@ -24,7 +24,7 @@ is a standalone package.
 | The wire protocol (messages, flow, timeouts) | [spec/protocol.md](./spec/protocol.md) |
 | The bastion config file and its JSON Schema | [README.md](./README.md), [spec/bastion-config.schema.json](./spec/bastion-config.schema.json) |
 | How to run the whole thing end to end | [examples/](./examples) |
-| The client library APIs | [hub/typescript/README.md](./hub/typescript/README.md), [hub/python/README.md](./hub/python/README.md) |
+| The client library APIs | [src/hub/README.md](./src/hub/README.md), [hub/python/README.md](./hub/python/README.md) |
 | Dev setup, build, and test | [CONTRIBUTING.md](./CONTRIBUTING.md) |
 | How releases work | [packaging/npm/README.md](./packaging/npm/README.md) |
 
@@ -36,7 +36,7 @@ pnpm build            # build protocol and bastion
 pnpm typecheck        # protocol, bastion, and TS client
 pnpm check:lockfiles  # ensure the root pnpm lockfile is the only lockfile
 pnpm test             # bastion tests
-pnpm test:hub      # TypeScript client tests
+pnpm test      # TypeScript client tests
 pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests (creates the venv on first run)
 pnpm test:all         # root-script suites above
@@ -47,7 +47,7 @@ If your default `python3` is older than 3.11, prefix Python-dependent commands
 with `PYTHON=/path/to/python3.11`, for example
 `PYTHON=/opt/homebrew/bin/python3.12 pnpm test:all`.
 
-Run `pnpm build`, `pnpm build:hub`, and `pnpm typecheck` before opening a
+Run `pnpm build`, `pnpm build`, and `pnpm typecheck` before opening a
 PR. Use `pnpm -r build` when you need every TypeScript workspace package built.
 This repo uses one pnpm lockfile: `pnpm-lock.yaml` at the repository root.
 The Docker database end-to-end tests are separate from `pnpm test:all`.
@@ -61,19 +61,22 @@ The Docker database end-to-end tests are separate from `pnpm test:all`.
 - **This code ships to customer datacenters.** Keep diffs minimal and
   security-reviewable; avoid reviewer-facing comments and unrelated reformatting.
 - **The bastion must survive a bad MCP server.** A server that fails to start is logged
-  and skipped, never fatal (see `Runtime.start` in `bastion/src/runtime.ts`).
+  and skipped, never fatal (see `Runtime.start` in `src/cli/runtime.ts`).
 - **Keep the TS and Python clients at parity.** A hook or method added to one belongs in
   the other.
 
-## Versioning & releases (lockstep)
+## Versioning & releases
 
-All four packages release at the **same** version, always — a customer relies on it to
-know they are protocol-compatible. Never edit versions by hand; bump them together so
-none drift:
+One publishable package, `@journal/journal-bastion`, so there is one version and nothing
+to keep in lockstep. The CLI, the hub library and the wire schemas ship inside it as the
+`.`, `./hub` and `./protocol` subpath exports. Never edit the version by hand:
 
 ```bash
-./packaging/bump-version.sh 0.8.0
+./packaging/bump-version.sh 0.9.0
 ```
 
-Full release steps (npm, PyPI, Homebrew, Docker) are in
+The Python client in `clients/python` is not published; it tracks the same version only
+for readability.
+
+Full release steps (npm, Homebrew, Docker) are in
 [packaging/npm/README.md](./packaging/npm/README.md).

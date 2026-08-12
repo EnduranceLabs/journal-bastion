@@ -13,7 +13,7 @@ The first argument is the message name (e.g., `heartbeat_ack`). The second argum
 
 ## 1. Add the Zod schema and TypeScript type
 
-Open `protocol/src/messages.ts` and add the Zod schema + type export.
+Open `src/protocol/messages.ts` and add the Zod schema + type export.
 
 Place it in the correct section based on direction:
 - **Bastion -> Service:** after the existing bastion messages (before `BastionMessageSchema`)
@@ -30,14 +30,14 @@ export type MyNewMessage = z.infer<typeof MyNewMessageSchema>;
 
 ## 2. Add to the discriminated union
 
-In the same file (`protocol/src/messages.ts`), add the new schema to the appropriate `z.discriminatedUnion("type", [...])`:
+In the same file (`src/protocol/messages.ts`), add the new schema to the appropriate `z.discriminatedUnion("type", [...])`:
 
 - **Bastion -> Service:** add to `BastionMessageSchema`
 - **Service -> Bastion:** add to `ServiceMessageSchema`
 
 ## 3. Re-export from index.ts
 
-Open `protocol/src/index.ts` and add the schema and type to the re-exports from `"./messages.js"`:
+Open `src/protocol/index.ts` and add the schema and type to the re-exports from `"./messages.js"`:
 
 ```ts
 export {
@@ -68,7 +68,7 @@ If the message changes the connection lifecycle, update the ASCII diagram at the
 
 ## 5. Add tests
 
-Open `bastion/src/__tests__/messages.test.ts` and add tests.
+Open `src/cli/__tests__/messages.test.ts` and add tests.
 
 Add in the appropriate `describe` block ("Bastion -> Service messages" or "Service -> Bastion messages"):
 
@@ -95,7 +95,7 @@ it("rejects my_new with missing field1", () => {
 
 ## 6. Keep clients and docs in sync
 
-- TypeScript clients re-export protocol types from `hub/typescript/src/types.ts`.
+- TypeScript clients re-export protocol types from `src/hub/types.ts`.
   Add the new schema/type there if it should be public from the client package.
 - Python clients define their own dataclasses and message handling in
   `hub/python/journal_bastion_hub/`. Update them when the message changes
@@ -108,7 +108,7 @@ it("rejects my_new with missing field1", () => {
 ```bash
 pnpm -r build         # Build workspace TypeScript packages
 pnpm test             # Bastion tests
-pnpm test:hub      # TypeScript client tests
+pnpm test      # TypeScript client tests
 pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 ```
@@ -116,8 +116,8 @@ pnpm test:python      # Python client tests
 ## Key files
 
 - `spec/protocol.md` — Protocol specification
-- `protocol/src/messages.ts` — Zod schemas and discriminated unions
-- `protocol/src/index.ts` — Re-exports
-- `hub/typescript/src/types.ts` — Client package re-exports
+- `src/protocol/messages.ts` — Zod schemas and discriminated unions
+- `src/protocol/index.ts` — Re-exports
+- `src/hub/types.ts` — Client package re-exports
 - `hub/python/journal_bastion_hub/` — Python client types and handlers
-- `bastion/src/__tests__/messages.test.ts` — Message parsing tests
+- `src/cli/__tests__/messages.test.ts` — Message parsing tests

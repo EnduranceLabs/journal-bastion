@@ -12,7 +12,6 @@ pnpm install
 pnpm build
 
 # Build TypeScript client
-pnpm build:hub
 
 # Type check protocol, bastion, and TypeScript client
 pnpm typecheck
@@ -24,7 +23,6 @@ pnpm check:lockfiles
 pnpm test
 
 # Run TypeScript client tests
-pnpm test:hub
 
 # Run TypeScript integration tests
 pnpm test:integration
@@ -73,10 +71,10 @@ callbacks such as `onSocketError` / `on_socket_error`.
 +-------------+        +------------------+        +-----------+
 ```
 
-### TypeScript (`journal-bastion-hub`)
+### TypeScript (`@journal/journal-bastion`)
 
 ```typescript
-import { BastionServer } from "journal-bastion-hub";
+import { BastionServer } from "@journal/journal-bastion/hub";
 
 const server = new BastionServer({
   port: 8080,
@@ -93,7 +91,7 @@ console.log(result.content);
 await server.stop();
 ```
 
-### Python (`journal-bastion-hub`)
+### Python (`@journal/journal-bastion`)
 
 ```python
 from journal_bastion_hub import BastionServer, TokenValidationResult
@@ -119,19 +117,17 @@ The bastion communicates with Journal over WebSocket using a simple JSON protoco
 
 ## Telemetry and audit
 
-- Telemetry bootstrapper: `bastion/src/telemetry.ts` (minimal OTLP/HTTP exporters for traces and metrics; defaults to `service.name=journal-bastion`; no OTEL logs).
-- Audit logger: `bastion/src/audit.ts`, records metadata only (no arguments, results, or secrets). Events include tool call start/result/error, outbound message metadata, config/env reloads, and MCP process lifecycle.
-- Instrumentation hooks live in `bastion/src/connection.ts` (tool call spans/metrics + audit) and `bastion/src/runtime.ts` (config/env apply events, MCP start/stop). Keep additions metadata-only; use ids/hashes instead of payloads.
+- Telemetry bootstrapper: `src/cli/telemetry.ts` (minimal OTLP/HTTP exporters for traces and metrics; defaults to `service.name=journal-bastion`; no OTEL logs).
+- Audit logger: `src/cli/audit.ts`, records metadata only (no arguments, results, or secrets). Events include tool call start/result/error, outbound message metadata, config/env reloads, and MCP process lifecycle.
+- Instrumentation hooks live in `src/cli/connection.ts` (tool call spans/metrics + audit) and `src/cli/runtime.ts` (config/env apply events, MCP start/stop). Keep additions metadata-only; use ids/hashes instead of payloads.
 - Env toggles: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `TELEMETRY_DISABLED`, `AUDIT_LOG_FILE`, `AUDIT_MAX_BYTES`, `AUDIT_MAX_FILES`.
 
 ## Packaging
 
-All four packages (`journal-bastion-protocol`, `journal-bastion`, the npm
-`journal-bastion-hub`, and the PyPI `journal-bastion-hub`) release in
-lockstep at the same version. Bump them together
-with `packaging/bump-version.sh` — never edit versions by hand. See
-[packaging/npm/README.md](./packaging/npm/README.md) for the full release runbook
-(npm, PyPI, Homebrew, and Docker).
+One publishable package, `@journal/journal-bastion`, carrying the CLI (`.`), the hub
+library (`./hub`) and the wire schemas (`./protocol`) as subpath exports. Set the version
+with `packaging/bump-version.sh` — never edit it by hand. See
+[packaging/npm/README.md](./packaging/npm/README.md) for the release runbook.
 
 ```bash
 # Bump every package to the same version
@@ -143,5 +139,5 @@ docker build -f packaging/docker/Dockerfile -t journal-bastion .
 
 ## Pre-PR checklist
 
-- Run `pnpm build`, `pnpm build:hub`, and `pnpm typecheck` before opening a PR or publishing. Use `pnpm -r build` when you need every TypeScript workspace package built.
+- Run `pnpm build`, `pnpm build`, and `pnpm typecheck` before opening a PR or publishing. Use `pnpm -r build` when you need every TypeScript workspace package built.
 - Run `pnpm check:lockfiles` before opening a PR.

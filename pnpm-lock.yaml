@@ -6,9 +6,7 @@ settings:
 
 importers:
 
-  .: {}
-
-  bastion:
+  .:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
@@ -37,9 +35,6 @@ importers:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
-      journal-bastion-protocol:
-        specifier: workspace:*
-        version: link:../protocol
       ws:
         specifier: ^8.21.1
         version: 8.21.1
@@ -59,47 +54,12 @@ importers:
       vitest:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.19.11)
-
-  hub/typescript:
-    dependencies:
-      journal-bastion-protocol:
-        specifier: workspace:*
-        version: link:../../protocol
-      ws:
-        specifier: ^8.21.1
-        version: 8.21.1
-      zod:
-        specifier: ^3.24
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22
-        version: 22.19.11
-      '@types/ws':
-        specifier: ^8
-        version: 8.18.1
-      typescript:
-        specifier: ^5.7
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.7
-        version: 3.2.7(@types/node@22.19.11)
-
-  protocol:
-    dependencies:
-      zod:
-        specifier: ^3.24
-        version: 3.25.76
-    devDependencies:
-      typescript:
-        specifier: ^5.7
-        version: 5.9.3
 
   testing/integration/ts:
     dependencies:
-      journal-bastion-hub:
-        specifier: workspace:*
-        version: link:../../../hub/typescript
+      '@journal/journal-bastion':
+        specifier: link:../../..
+        version: link:../../..
     devDependencies:
       '@types/node':
         specifier: ^22

@@ -1,6 +1,6 @@
 """Minimal Journal Bastion client server (Python).
 
-    pip install journal-bastion-hub
+    pip install -e clients/python   # unpublished; install from source
     python hub_server.py
 
 Then point a bastion at ws://localhost:8080 with token "gw_demo":
