@@ -43,7 +43,7 @@ let mockWsFactory: ((url: string) => MockWebSocket) | null = null;
 
 const config: BastionConfig = {
   token: "gw_test123",
-  url: "wss://localhost/v1",
+  url: "wss://localhost",
   logLevel: "error",
 };
 

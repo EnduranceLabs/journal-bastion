@@ -64,7 +64,12 @@ describe("parseConfig", () => {
 
   it("uses default URL when not specified", () => {
     const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
-    expect(config.url).toBe("wss://bastion.journal.one/v1");
+    expect(config.url).toBe("wss://bastion.journal.one");
+  });
+
+  it("defaults to a URL with no path, because the service upgrades at the root", () => {
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
+    expect(new URL(config.url).pathname).toBe("/");
   });
 
   it("uses default log level when not specified", () => {
@@ -75,14 +80,28 @@ describe("parseConfig", () => {
   it("respects custom URL and log level", () => {
     const config = parseConfig(
       baseEnv({
-        JOURNAL_BASTION_URL: "wss://custom.example.com/v1",
+        JOURNAL_BASTION_URL: "wss://custom.example.com",
         LOG_LEVEL: "debug",
         JOURNAL_BASTION_CONFIG: "{}",
       }),
       []
     );
-    expect(config.url).toBe("wss://custom.example.com/v1");
+    expect(config.url).toBe("wss://custom.example.com");
     expect(config.logLevel).toBe("debug");
+  });
+
+  // A self-hosted hub can feed BastionServer.handleConnection from a route
+  // under any prefix, so an explicit path must survive untouched. This is the
+  // guard against "fix the /v1 default" turning into "strip every path".
+  it("passes an explicit path through verbatim", () => {
+    const config = parseConfig(
+      baseEnv({
+        JOURNAL_BASTION_URL: "wss://hub.internal.example.com/bastion",
+        JOURNAL_BASTION_CONFIG: "{}",
+      }),
+      []
+    );
+    expect(config.url).toBe("wss://hub.internal.example.com/bastion");
   });
 
   it("rejects non-WebSocket URL schemes", () => {

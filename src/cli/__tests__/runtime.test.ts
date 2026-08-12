@@ -139,7 +139,7 @@ const testIntegration: McpServerConfig = {
 function makeConfig(integrations: McpServerConfig[] = [testIntegration]): RuntimeConfig {
   return {
     token: "gw_test",
-    url: "wss://localhost/v1",
+    url: "wss://localhost",
     logLevel: "error",
     mcpServers: integrations,
     mcpEnvVars: new Map(
