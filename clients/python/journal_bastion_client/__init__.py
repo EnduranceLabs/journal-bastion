@@ -1,26 +1,26 @@
-from .server import GatewayServer, TokenValidationResult
+from .server import BastionServer, TokenValidationResult
 from .types import (
     Integration,
     ToolDefinition,
     Skill,
     ToolResult,
-    GatewayError,
+    BastionError,
     TextContent,
     ImageContent,
     ContentBlock,
-    ConnectedGateway,
+    ConnectedBastion,
 )
 
 __all__ = [
-    "GatewayServer",
+    "BastionServer",
     "TokenValidationResult",
     "Integration",
     "ToolDefinition",
     "Skill",
     "ToolResult",
-    "GatewayError",
+    "BastionError",
     "TextContent",
     "ImageContent",
     "ContentBlock",
-    "ConnectedGateway",
+    "ConnectedBastion",
 ]

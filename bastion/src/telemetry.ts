@@ -35,7 +35,7 @@ export class Telemetry {
     if (!options.endpoint) return;
 
     const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: options.serviceName ?? "journal-gateway",
+      [ATTR_SERVICE_NAME]: options.serviceName ?? "journal-bastion",
       ...options.resourceAttributes,
     });
 
@@ -54,12 +54,12 @@ export class Telemetry {
     });
     metrics.setGlobalMeterProvider(this.meterProvider);
 
-    const meter = metrics.getMeter("gateway");
-    this.toolCallHistogram = meter.createHistogram("gateway.tool_call.duration", {
+    const meter = metrics.getMeter("bastion");
+    this.toolCallHistogram = meter.createHistogram("bastion.tool_call.duration", {
       description: "Tool call duration in milliseconds",
       unit: "ms",
     });
-    this.toolCallCounter = meter.createCounter("gateway.tool_call.count", {
+    this.toolCallCounter = meter.createCounter("bastion.tool_call.count", {
       description: "Count of tool calls by outcome",
     });
     this.started = true;
@@ -79,7 +79,7 @@ export class Telemetry {
     traceparent?: string,
     tracestate?: string,
   ): Promise<T> {
-    const tracer = trace.getTracer("gateway");
+    const tracer = trace.getTracer("bastion");
 
     // Use remote parent context when a W3C traceparent is provided,
     // otherwise fall back to the current active context.
@@ -123,24 +123,24 @@ export class Telemetry {
     tracestate?: string,
   ): Promise<ToolCallOutcome> {
     return this.startActiveSpan(
-      "gateway.tool_call",
+      "bastion.tool_call",
       attrs,
       async (span) => {
         const outcome = await fn();
         switch (outcome.kind) {
           case "success":
-            span.setAttribute("gateway.tool_call.is_error", false);
+            span.setAttribute("bastion.tool_call.is_error", false);
             break;
           case "tool_error":
             span.setStatus({ code: SpanStatusCode.ERROR, message: "Tool returned error" });
-            span.setAttribute("gateway.tool_call.is_error", true);
-            span.setAttribute("gateway.tool_call.error_message", outcome.error);
+            span.setAttribute("bastion.tool_call.is_error", true);
+            span.setAttribute("bastion.tool_call.error_message", outcome.error);
             break;
           case "exception":
             span.setStatus({ code: SpanStatusCode.ERROR, message: outcome.error });
-            span.setAttribute("gateway.tool_call.is_error", true);
-            span.setAttribute("gateway.tool_call.error_code", outcome.code);
-            span.setAttribute("gateway.tool_call.error_message", outcome.error);
+            span.setAttribute("bastion.tool_call.is_error", true);
+            span.setAttribute("bastion.tool_call.error_code", outcome.code);
+            span.setAttribute("bastion.tool_call.error_message", outcome.error);
             break;
         }
         return outcome;

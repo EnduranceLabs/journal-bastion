@@ -4,14 +4,14 @@ Start here if you're a coding agent working in this repo.
 
 ## What this is
 
-Journal Gateway connects a customer's own tools to [Journal](https://journal.one). It is
+Journal Bastion connects a customer's own tools to [Journal](https://journal.one). It is
 two sides of one WebSocket protocol:
 
-- **Gateway** (`gateway/`) — runs inside the customer's network, connects *outbound* to
+- **Bastion** (`bastion/`) — runs inside the customer's network, connects *outbound* to
   Journal, and exposes their MCP servers and skill files. Credentials never leave their
   infrastructure and no inbound ports are opened.
 - **Client libraries** (`clients/typescript`, `clients/python`) — the service side that
-  accepts gateway connections, pulls their tools/skills, and calls tools.
+  accepts bastion connections, pulls their tools/skills, and calls tools.
 
 Both sides share the schemas in `protocol/`. It is a pnpm workspace; the Python client
 is a standalone package.
@@ -22,7 +22,7 @@ is a standalone package.
 |----------------|------|
 | The architecture, module by module | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 | The wire protocol (messages, flow, timeouts) | [spec/protocol.md](./spec/protocol.md) |
-| The gateway config file and its JSON Schema | [README.md](./README.md), [spec/gateway-config.schema.json](./spec/gateway-config.schema.json) |
+| The bastion config file and its JSON Schema | [README.md](./README.md), [spec/bastion-config.schema.json](./spec/bastion-config.schema.json) |
 | How to run the whole thing end to end | [examples/](./examples) |
 | The client library APIs | [clients/typescript/README.md](./clients/typescript/README.md), [clients/python/README.md](./clients/python/README.md) |
 | Dev setup, build, and test | [CONTRIBUTING.md](./CONTRIBUTING.md) |
@@ -32,12 +32,12 @@ is a standalone package.
 
 ```bash
 pnpm install
-pnpm build            # build protocol and gateway
-pnpm typecheck        # protocol, gateway, and TS client
+pnpm build            # build protocol and bastion
+pnpm typecheck        # protocol, bastion, and TS client
 pnpm check:lockfiles  # ensure the root pnpm lockfile is the only lockfile
-pnpm test             # gateway tests
+pnpm test             # bastion tests
 pnpm test:client      # TypeScript client tests
-pnpm test:integration # TypeScript integration (gateway <-> TS client)
+pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests (creates the venv on first run)
 pnpm test:all         # root-script suites above
 testing/e2e/run-all.sh # Docker database end-to-end tests (requires Docker)
@@ -57,11 +57,11 @@ The Docker database end-to-end tests are separate from `pnpm test:all`.
 - **Client libraries never write to the console.** They surface diagnostics only through
   customer-provided callbacks (`onSocketError` / `on_socket_error`, `getTraceContext` /
   `get_trace_context`). No `console.*` / `print`. The Python library's fallback is the
-  `journal_gateway_client` logger, silent by default.
+  `journal_bastion_client` logger, silent by default.
 - **This code ships to customer datacenters.** Keep diffs minimal and
   security-reviewable; avoid reviewer-facing comments and unrelated reformatting.
-- **The gateway must survive a bad MCP server.** A server that fails to start is logged
-  and skipped, never fatal (see `Runtime.start` in `gateway/src/runtime.ts`).
+- **The bastion must survive a bad MCP server.** A server that fails to start is logged
+  and skipped, never fatal (see `Runtime.start` in `bastion/src/runtime.ts`).
 - **Keep the TS and Python clients at parity.** A hook or method added to one belongs in
   the other.
 

@@ -3,14 +3,14 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ConfigWatcher } from "../config-watcher.js";
-import type { GatewayConfigFile } from "../config.js";
+import type { BastionConfigFile } from "../config.js";
 
 let tempDir: string;
 let configPath: string;
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "config-watcher-test-"));
-  configPath = join(tempDir, "gateway.json");
+  configPath = join(tempDir, "bastion.json");
 });
 
 afterEach(async () => {
@@ -31,7 +31,7 @@ describe("ConfigWatcher", () => {
     const watcher = new ConfigWatcher(configPath, logger);
     watcher.startWatching();
 
-    const changedPromise = new Promise<GatewayConfigFile>((resolve) => {
+    const changedPromise = new Promise<BastionConfigFile>((resolve) => {
       watcher.on("config_changed", resolve);
     });
 

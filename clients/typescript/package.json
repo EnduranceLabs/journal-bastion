@@ -1,24 +1,24 @@
 {
-  "name": "journal-gateway-client",
-  "version": "0.8.1",
-  "description": "TypeScript service-side client for accepting Journal Gateway connections",
+  "name": "journal-bastion-client",
+  "version": "0.9.0",
+  "description": "TypeScript service-side client for accepting Journal Bastion connections",
   "license": "MIT",
   "type": "module",
   "keywords": [
     "journal",
-    "journal-gateway",
+    "journal-bastion",
     "mcp",
     "model-context-protocol",
     "websocket"
   ],
-  "homepage": "https://github.com/EnduranceLabs/journal-gateway#readme",
+  "homepage": "https://github.com/EnduranceLabs/journal-bastion#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnduranceLabs/journal-gateway.git",
+    "url": "git+https://github.com/EnduranceLabs/journal-bastion.git",
     "directory": "clients/typescript"
   },
   "bugs": {
-    "url": "https://github.com/EnduranceLabs/journal-gateway/issues"
+    "url": "https://github.com/EnduranceLabs/journal-bastion/issues"
   },
   "main": "./dist/server.js",
   "types": "./dist/server.d.ts",
@@ -36,7 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "journal-gateway-protocol": "workspace:*",
+    "journal-bastion-protocol": "workspace:*",
     "ws": "^8.21.1",
     "zod": "^3.24"
   },

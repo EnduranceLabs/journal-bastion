@@ -15,13 +15,13 @@ from .types import (
     ToolDefinition,
     Skill,
     ToolResult,
-    GatewayError,
-    ConnectedGateway,
+    BastionError,
+    ConnectedBastion,
     TextContent,
     ImageContent,
 )
 
-logger = logging.getLogger("journal_gateway_client")
+logger = logging.getLogger("journal_bastion_client")
 logger.addHandler(logging.NullHandler())
 
 
@@ -34,10 +34,10 @@ class TokenValidationResult:
 TokenValidator = Callable[[str], Awaitable[TokenValidationResult | None]]
 
 
-class _GatewayConn:
-    """Internal wrapper for a single gateway WebSocket connection."""
+class _BastionConn:
+    """Internal wrapper for a single bastion WebSocket connection."""
 
-    def __init__(self, ws: websockets.asyncio.server.ServerConnection, info: ConnectedGateway):
+    def __init__(self, ws: websockets.asyncio.server.ServerConnection, info: ConnectedBastion):
         self.ws = ws
         self.info = info
         self.pending: dict[str, asyncio.Future[ToolResult]] = {}
@@ -110,7 +110,7 @@ class _GatewayConn:
         if future and not future.done():
             future.set_result(result)
 
-    def resolve_error(self, request_id: str, error: GatewayError) -> None:
+    def resolve_error(self, request_id: str, error: BastionError) -> None:
         future = self.pending.pop(request_id, None)
         if future and not future.done():
             future.set_exception(
@@ -128,8 +128,8 @@ class _GatewayConn:
         self.pending_pulls.clear()
 
 
-class GatewayServer:
-    """WebSocket server that accepts gateway connections and provides a tool-calling API."""
+class BastionServer:
+    """WebSocket server that accepts bastion connections and provides a tool-calling API."""
 
     def __init__(
         self,
@@ -140,7 +140,7 @@ class GatewayServer:
         pong_timeout: float = 10.0,
         pull_timeout: float = 30.0,
         get_trace_context: Callable[[], dict | None] | None = None,
-        on_socket_error: Callable[[Exception, ConnectedGateway | None], None] | None = None,
+        on_socket_error: Callable[[Exception, ConnectedBastion | None], None] | None = None,
     ):
         self._validate_token = validate_token
         self._host = host
@@ -151,23 +151,23 @@ class GatewayServer:
         self._get_trace_context = get_trace_context
         self._on_socket_error = on_socket_error
         self._server: websockets.asyncio.server.Server | None = None
-        self._gateways: dict[str, _GatewayConn] = {}
+        self._bastions: dict[str, _BastionConn] = {}
         self._next_id = 0
-        self.on_gateway_connected: Callable[[ConnectedGateway], None] | None = None
-        self.on_gateway_updated: Callable[[ConnectedGateway], None] | None = None
-        self.on_gateway_disconnected: Callable[[ConnectedGateway], None] | None = None
+        self.on_bastion_connected: Callable[[ConnectedBastion], None] | None = None
+        self.on_bastion_updated: Callable[[ConnectedBastion], None] | None = None
+        self.on_bastion_disconnected: Callable[[ConnectedBastion], None] | None = None
 
     def _report_socket_error(
-        self, error: Exception, gateway: ConnectedGateway | None
+        self, error: Exception, bastion: ConnectedBastion | None
     ) -> None:
         if not self._on_socket_error:
             logger.error(
-                "Gateway connection error",
+                "Bastion connection error",
                 exc_info=(type(error), error, error.__traceback__),
             )
             return
         try:
-            self._on_socket_error(error, gateway)
+            self._on_socket_error(error, bastion)
         except Exception:
             pass
 
@@ -180,13 +180,13 @@ class GatewayServer:
         return f"ws://localhost:{self._port}"
 
     @property
-    def connected_gateways(self) -> list[ConnectedGateway]:
-        return [g.info for g in self._gateways.values()]
+    def connected_bastions(self) -> list[ConnectedBastion]:
+        return [g.info for g in self._bastions.values()]
 
     @property
     def available_tools(self) -> list[dict[str, str]]:
         tools: list[dict[str, str]] = []
-        for gw in self._gateways.values():
+        for gw in self._bastions.values():
             for integration in gw.info.integrations:
                 for tool in integration.tools:
                     tools.append({
@@ -196,16 +196,16 @@ class GatewayServer:
                     })
         return tools
 
-    def has_gateway_for_org(self, organization_id: str) -> bool:
+    def has_bastion_for_org(self, organization_id: str) -> bool:
         return any(
             gw.info.organization_id == organization_id
-            for gw in self._gateways.values()
+            for gw in self._bastions.values()
         )
 
-    def get_gateways_for_org(self, organization_id: str) -> list[ConnectedGateway]:
+    def get_bastions_for_org(self, organization_id: str) -> list[ConnectedBastion]:
         return [
             gw.info
-            for gw in self._gateways.values()
+            for gw in self._bastions.values()
             if gw.info.organization_id == organization_id
         ]
 
@@ -214,7 +214,7 @@ class GatewayServer:
     ) -> list[dict]:
         seen: set[str] = set()
         tools: list[dict] = []
-        for gw in self._gateways.values():
+        for gw in self._bastions.values():
             if gw.info.organization_id != organization_id:
                 continue
             for integration in gw.info.integrations:
@@ -241,9 +241,9 @@ class GatewayServer:
             break
 
     async def stop(self) -> None:
-        for gw in self._gateways.values():
+        for gw in self._bastions.values():
             gw.reject_all("Server shutting down")
-        self._gateways.clear()
+        self._bastions.clear()
         if self._server:
             self._server.close()
             await self._server.wait_closed()
@@ -255,10 +255,10 @@ class GatewayServer:
         arguments: dict,
         timeout: float = 60.0,
     ) -> ToolResult:
-        """Call a tool on a connected gateway."""
-        gw = self._find_gateway(integration_id)
+        """Call a tool on a connected bastion."""
+        gw = self._find_bastion(integration_id)
         if not gw:
-            raise LookupError(f"No gateway has integration '{integration_id}'")
+            raise LookupError(f"No bastion has integration '{integration_id}'")
         return await gw.call_tool(
             integration_id, tool_name, arguments, timeout, self._trace_context()
         )
@@ -271,21 +271,21 @@ class GatewayServer:
         arguments: dict,
         timeout: float = 90.0,
     ) -> ToolResult:
-        """Call a tool on any gateway for the given org that provides the integration.
+        """Call a tool on any bastion for the given org that provides the integration.
 
         Picks a random candidate for load balancing and retries on a different
         one if the call fails with a connection error.
         """
         candidates = [
             gw
-            for gw in self._gateways.values()
+            for gw in self._bastions.values()
             if gw.info.organization_id == organization_id
             and any(i.id == integration_id for i in gw.info.integrations)
         ]
 
         if not candidates:
             raise LookupError(
-                f"No gateway for org '{organization_id}' has integration '{integration_id}'"
+                f"No bastion for org '{organization_id}' has integration '{integration_id}'"
             )
 
         random.shuffle(candidates)
@@ -300,35 +300,35 @@ class GatewayServer:
             except Exception as err:
                 last_error = err
                 # Only retry on connection-level errors
-                if "Gateway disconnected" not in str(err):
+                if "Bastion disconnected" not in str(err):
                     raise
         raise last_error  # type: ignore[misc]
 
-    async def get_versions(self, gateway_id: str) -> dict:
-        """Pull current versions from a gateway."""
-        gw = self._gateways.get(gateway_id)
+    async def get_versions(self, bastion_id: str) -> dict:
+        """Pull current versions from a bastion."""
+        gw = self._bastions.get(bastion_id)
         if not gw:
-            raise LookupError(f"Gateway '{gateway_id}' not found")
+            raise LookupError(f"Bastion '{bastion_id}' not found")
         return await gw.send_pull("get_versions", timeout=self._pull_timeout)
 
-    async def get_tools(self, gateway_id: str) -> dict:
-        """Pull tools from a gateway."""
-        gw = self._gateways.get(gateway_id)
+    async def get_tools(self, bastion_id: str) -> dict:
+        """Pull tools from a bastion."""
+        gw = self._bastions.get(bastion_id)
         if not gw:
-            raise LookupError(f"Gateway '{gateway_id}' not found")
+            raise LookupError(f"Bastion '{bastion_id}' not found")
         return await gw.send_pull("get_tools", timeout=self._pull_timeout)
 
-    async def get_skills(self, gateway_id: str) -> dict:
-        """Pull skills from a gateway."""
-        gw = self._gateways.get(gateway_id)
+    async def get_skills(self, bastion_id: str) -> dict:
+        """Pull skills from a bastion."""
+        gw = self._bastions.get(bastion_id)
         if not gw:
-            raise LookupError(f"Gateway '{gateway_id}' not found")
+            raise LookupError(f"Bastion '{bastion_id}' not found")
         return await gw.send_pull("get_skills", timeout=self._pull_timeout)
 
     async def _handle_connection(self, ws: websockets.asyncio.server.ServerConnection) -> None:
         self._next_id += 1
         conn_id = f"gw_{self._next_id}"
-        gw_conn: _GatewayConn | None = None
+        gw_conn: _BastionConn | None = None
         background_tasks: set[asyncio.Task[None]] = set()
 
         def start_background(coro: Awaitable[None]) -> asyncio.Task[None]:
@@ -351,7 +351,7 @@ class GatewayServer:
                 return
 
             protocol_version = msg.get("protocolVersion", 0)
-            gateway_version = msg.get("gatewayVersion", "unknown")
+            bastion_version = msg.get("gatewayVersion", "unknown")
 
             result = await self._validate_token(msg["token"])
             if result is None:
@@ -385,17 +385,17 @@ class GatewayServer:
             mcp_version = msg.get("mcpVersion")
             skills_version = msg.get("skillsVersion")
 
-            info = ConnectedGateway(
+            info = ConnectedBastion(
                 id=conn_id,
                 organization_id=result.organization_id,
                 protocol_version=protocol_version,
-                gateway_version=gateway_version,
+                bastion_version=bastion_version,
                 integrations=[],
                 mcp_version=mcp_version,
                 skills_version=skills_version,
             )
-            gw_conn = _GatewayConn(ws, info)
-            self._gateways[conn_id] = gw_conn
+            gw_conn = _BastionConn(ws, info)
+            self._bastions[conn_id] = gw_conn
 
             # Phase 3: Steady state - start message loop first so pull
             # responses can be processed, then auto-pull concurrently.
@@ -417,7 +417,7 @@ class GatewayServer:
                         tool_result = self._parse_tool_result(msg["result"])
                         gw_conn.resolve_result(msg["requestId"], tool_result)
                     elif msg_type == "tool_error":
-                        error = GatewayError(
+                        error = BastionError(
                             code=msg["error"]["code"],
                             message=msg["error"]["message"],
                         )
@@ -481,16 +481,16 @@ class GatewayServer:
             self._report_socket_error(e, gw_conn.info if gw_conn else None)
         finally:
             if gw_conn:
-                gw_conn.reject_all("Gateway disconnected")
-                self._gateways.pop(conn_id, None)
-                if self.on_gateway_disconnected:
-                    self.on_gateway_disconnected(gw_conn.info)
+                gw_conn.reject_all("Bastion disconnected")
+                self._bastions.pop(conn_id, None)
+                if self.on_bastion_disconnected:
+                    self.on_bastion_disconnected(gw_conn.info)
 
-    async def _run_initial_pull(self, gw_conn: _GatewayConn) -> None:
+    async def _run_initial_pull(self, gw_conn: _BastionConn) -> None:
         try:
             await self._auto_pull(gw_conn)
-            if self.on_gateway_connected:
-                self.on_gateway_connected(gw_conn.info)
+            if self.on_bastion_connected:
+                self.on_bastion_connected(gw_conn.info)
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -499,7 +499,7 @@ class GatewayServer:
 
     async def _handle_version_update(
         self,
-        gw_conn: _GatewayConn,
+        gw_conn: _BastionConn,
         mcp_changed: bool,
         skills_changed: bool,
         new_mcp: str | None,
@@ -518,15 +518,15 @@ class GatewayServer:
                 gw_conn.info.integrations = [
                     i for i in gw_conn.info.integrations if i.id != "skills"
                 ]
-            if self.on_gateway_updated:
-                self.on_gateway_updated(gw_conn.info)
+            if self.on_bastion_updated:
+                self.on_bastion_updated(gw_conn.info)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             self._report_socket_error(e, gw_conn.info)
             await gw_conn.ws.close()
 
-    async def _auto_pull(self, gw_conn: _GatewayConn) -> None:
+    async def _auto_pull(self, gw_conn: _BastionConn) -> None:
         """Pull tools and/or skills based on versions."""
         tasks = []
         if gw_conn.info.mcp_version is not None:
@@ -536,8 +536,8 @@ class GatewayServer:
         if tasks:
             await asyncio.gather(*tasks)
 
-    async def _pull_tools(self, gw_conn: _GatewayConn) -> None:
-        """Pull tools from a gateway and update its integrations."""
+    async def _pull_tools(self, gw_conn: _BastionConn) -> None:
+        """Pull tools from a bastion and update its integrations."""
         data = await gw_conn.send_pull("get_tools", timeout=self._pull_timeout)
         integrations = data.get("integrations", [])
         # Keep skills, replace tool integrations
@@ -545,8 +545,8 @@ class GatewayServer:
         gw_conn.info.integrations = list(integrations) + skills_integrations
         gw_conn.info.mcp_version = data.get("mcpVersion")
 
-    async def _pull_skills(self, gw_conn: _GatewayConn) -> None:
-        """Pull skills from a gateway and update its integrations."""
+    async def _pull_skills(self, gw_conn: _BastionConn) -> None:
+        """Pull skills from a bastion and update its integrations."""
         data = await gw_conn.send_pull("get_skills", timeout=self._pull_timeout)
         skills = data.get("skills", [])
         # Keep non-skills integrations, replace skills integration
@@ -555,7 +555,7 @@ class GatewayServer:
             non_skills.append(Integration(
                 id="skills",
                 name="Skills",
-                description="Gateway skills",
+                description="Bastion skills",
                 tools=[],
                 skills=list(skills),
             ))
@@ -568,7 +568,7 @@ class GatewayServer:
         try:
             while True:
                 await asyncio.sleep(self._ping_interval)
-                gw_conn = self._gateways.get(conn_id)
+                gw_conn = self._bastions.get(conn_id)
                 if not gw_conn:
                     break
                 gw_conn.pong_received.clear()
@@ -587,8 +587,8 @@ class GatewayServer:
     def _trace_context(self) -> dict | None:
         return self._get_trace_context() if self._get_trace_context else None
 
-    def _find_gateway(self, integration_id: str) -> _GatewayConn | None:
-        for gw in self._gateways.values():
+    def _find_bastion(self, integration_id: str) -> _BastionConn | None:
+        for gw in self._bastions.values():
             if any(i.id == integration_id for i in gw.info.integrations):
                 return gw
         return None

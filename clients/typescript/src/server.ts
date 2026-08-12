@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Integration, ToolDefinition, ToolResult, Skill } from "./types.js";
-import { GatewayMessageSchema } from "./types.js";
+import { BastionMessageSchema } from "./types.js";
 
 export interface TokenValidationResult {
   organizationId: string;
@@ -12,11 +12,11 @@ export interface TraceContext {
   tracestate?: string;
 }
 
-export interface GatewayServerOptions {
+export interface BastionServerOptions {
   /**
-   * Port to bind when using {@link GatewayServer.start}.
+   * Port to bind when using {@link BastionServer.start}.
    * Pass `0` to let the OS pick an available port.
-   * Not used when feeding connections externally via {@link GatewayServer.handleConnection}.
+   * Not used when feeding connections externally via {@link BastionServer.handleConnection}.
    */
   port?: number;
   validateToken: (token: string) => Promise<TokenValidationResult | null>;
@@ -24,20 +24,20 @@ export interface GatewayServerOptions {
   pullTimeoutMs?: number;
   /**
    * Optional hook to extract W3C trace context from the active span for
-   * propagation to the gateway. Called when sending tool_call messages.
+   * propagation to the bastion. Called when sending tool_call messages.
    * Return `null` when no active trace context is available.
    */
   getTraceContext?: () => TraceContext | null;
   /**
-   * Called for gateway socket errors and unexpected connection-handler
-   * failures. `gateway` is `null` if the failure happened before completing
+   * Called for bastion socket errors and unexpected connection-handler
+   * failures. `bastion` is `null` if the failure happened before completing
    * the handshake. When not provided, diagnostics are dropped — the library
    * never logs on its own.
    */
-  onSocketError?: (error: Error, gateway: ConnectedGateway | null) => void;
+  onSocketError?: (error: Error, bastion: ConnectedBastion | null) => void;
 }
 
-export interface ConnectedGateway {
+export interface ConnectedBastion {
   id: string;
   organizationId: string;
   protocolVersion: number;
@@ -59,17 +59,17 @@ interface PendingPull {
   timer: ReturnType<typeof setTimeout>;
 }
 
-interface GatewayEntry {
+interface BastionEntry {
   ws: WebSocket;
-  gateway: ConnectedGateway;
+  bastion: ConnectedBastion;
   pending: Map<string, PendingCall>;
   pendingPulls: Map<string, PendingPull>;
   pongTimer: ReturnType<typeof setTimeout> | null;
 }
 
-export class GatewayServer {
+export class BastionServer {
   private wss: WebSocketServer | null = null;
-  private gateways = new Map<string, GatewayEntry>();
+  private bastions = new Map<string, BastionEntry>();
   private _port: number;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private connCounter = 0;
@@ -77,7 +77,7 @@ export class GatewayServer {
   private pullCounter = 0;
   private pullTimeoutMs: number;
 
-  constructor(private options: GatewayServerOptions) {
+  constructor(private options: BastionServerOptions) {
     this._port = options.port ?? 0;
     this.pullTimeoutMs = options.pullTimeoutMs ?? 30_000;
   }
@@ -90,14 +90,14 @@ export class GatewayServer {
     return `ws://localhost:${this._port}`;
   }
 
-  get connectedGateways(): ConnectedGateway[] {
-    return Array.from(this.gateways.values()).map((g) => g.gateway);
+  get connectedBastions(): ConnectedBastion[] {
+    return Array.from(this.bastions.values()).map((g) => g.bastion);
   }
 
   get availableTools(): Array<{ integrationId: string; name: string; description: string }> {
     const tools: Array<{ integrationId: string; name: string; description: string }> = [];
-    for (const { gateway } of this.gateways.values()) {
-      for (const integration of gateway.integrations) {
+    for (const { bastion } of this.bastions.values()) {
+      for (const integration of bastion.integrations) {
         for (const tool of integration.tools) {
           tools.push({
             integrationId: integration.id,
@@ -110,10 +110,10 @@ export class GatewayServer {
     return tools;
   }
 
-  onGatewayConnected?: (gateway: ConnectedGateway) => void;
-  onGatewayUpdated?: (gateway: ConnectedGateway) => void;
-  onGatewayDisconnected?: (
-    gateway: ConnectedGateway,
+  onBastionConnected?: (bastion: ConnectedBastion) => void;
+  onBastionUpdated?: (bastion: ConnectedBastion) => void;
+  onBastionDisconnected?: (
+    bastion: ConnectedBastion,
     closeCode?: number,
     closeReason?: string,
   ) => void;
@@ -174,7 +174,7 @@ export class GatewayServer {
   }
 
   /**
-   * Clean up all gateway connections and timers.
+   * Clean up all bastion connections and timers.
    *
    * Use this instead of {@link stop} when you manage the HTTP server yourself
    * and don't need to close the internal WebSocketServer.
@@ -185,7 +185,7 @@ export class GatewayServer {
       this.pingTimer = null;
     }
 
-    for (const [connId, entry] of this.gateways.entries()) {
+    for (const [connId, entry] of this.bastions.entries()) {
       if (entry.pongTimer) clearTimeout(entry.pongTimer);
       for (const pending of entry.pending.values()) {
         clearTimeout(pending.timer);
@@ -196,8 +196,8 @@ export class GatewayServer {
         pull.reject(new Error("Server shutting down"));
       }
       // Remove before closing so the ws close handler doesn't double-fire
-      this.gateways.delete(connId);
-      this.onGatewayDisconnected?.(entry.gateway);
+      this.bastions.delete(connId);
+      this.onBastionDisconnected?.(entry.bastion);
       entry.ws.close();
     }
   }
@@ -208,49 +208,49 @@ export class GatewayServer {
     args: Record<string, unknown>,
     timeoutMs = 90_000
   ): Promise<ToolResult> {
-    let targetEntry: GatewayEntry | undefined;
-    for (const entry of this.gateways.values()) {
-      if (entry.gateway.integrations.some((i) => i.id === integrationId)) {
+    let targetEntry: BastionEntry | undefined;
+    for (const entry of this.bastions.values()) {
+      if (entry.bastion.integrations.some((i) => i.id === integrationId)) {
         targetEntry = entry;
         break;
       }
     }
 
     if (!targetEntry) {
-      throw new Error(`No gateway has integration "${integrationId}"`);
+      throw new Error(`No bastion has integration "${integrationId}"`);
     }
 
     return this.callToolOnEntry(targetEntry, integrationId, toolName, args, timeoutMs);
   }
 
-  /** Check if any gateway is connected for the given organization. */
-  hasGatewayForOrg(organizationId: string): boolean {
-    for (const { gateway } of this.gateways.values()) {
-      if (gateway.organizationId === organizationId) return true;
+  /** Check if any bastion is connected for the given organization. */
+  hasBastionForOrg(organizationId: string): boolean {
+    for (const { bastion } of this.bastions.values()) {
+      if (bastion.organizationId === organizationId) return true;
     }
     return false;
   }
 
-  /** Get all connected gateways for an organization. */
-  getGatewaysForOrg(organizationId: string): ConnectedGateway[] {
-    const result: ConnectedGateway[] = [];
-    for (const { gateway } of this.gateways.values()) {
-      if (gateway.organizationId === organizationId) {
-        result.push(gateway);
+  /** Get all connected bastions for an organization. */
+  getBastionsForOrg(organizationId: string): ConnectedBastion[] {
+    const result: ConnectedBastion[] = [];
+    for (const { bastion } of this.bastions.values()) {
+      if (bastion.organizationId === organizationId) {
+        result.push(bastion);
       }
     }
     return result;
   }
 
-  /** Get deduplicated tools across all gateways for an organization. */
+  /** Get deduplicated tools across all bastions for an organization. */
   getToolsForOrg(
     organizationId: string
   ): Array<{ integrationId: string; tool: ToolDefinition }> {
     const seen = new Set<string>();
     const tools: Array<{ integrationId: string; tool: ToolDefinition }> = [];
-    for (const { gateway } of this.gateways.values()) {
-      if (gateway.organizationId !== organizationId) continue;
-      for (const integration of gateway.integrations) {
+    for (const { bastion } of this.bastions.values()) {
+      if (bastion.organizationId !== organizationId) continue;
+      for (const integration of bastion.integrations) {
         for (const tool of integration.tools) {
           const key = `${integration.id}.${tool.name}`;
           if (!seen.has(key)) {
@@ -263,26 +263,26 @@ export class GatewayServer {
     return tools;
   }
 
-  /** Pull current versions from a gateway. */
-  async getVersions(gatewayId: string): Promise<{ mcpVersion: string | null; skillsVersion: string | null }> {
-    const data = await this.sendPull(gatewayId, "get_versions");
+  /** Pull current versions from a bastion. */
+  async getVersions(bastionId: string): Promise<{ mcpVersion: string | null; skillsVersion: string | null }> {
+    const data = await this.sendPull(bastionId, "get_versions");
     return data as { mcpVersion: string | null; skillsVersion: string | null };
   }
 
-  /** Pull tools from a gateway. */
-  async getTools(gatewayId: string): Promise<{ integrations: Integration[]; mcpVersion: string | null }> {
-    const data = await this.sendPull(gatewayId, "get_tools");
+  /** Pull tools from a bastion. */
+  async getTools(bastionId: string): Promise<{ integrations: Integration[]; mcpVersion: string | null }> {
+    const data = await this.sendPull(bastionId, "get_tools");
     return data as { integrations: Integration[]; mcpVersion: string | null };
   }
 
-  /** Pull skills from a gateway. */
-  async getSkills(gatewayId: string): Promise<{ skills: Skill[]; skillsVersion: string | null }> {
-    const data = await this.sendPull(gatewayId, "get_skills");
+  /** Pull skills from a bastion. */
+  async getSkills(bastionId: string): Promise<{ skills: Skill[]; skillsVersion: string | null }> {
+    const data = await this.sendPull(bastionId, "get_skills");
     return data as { skills: Skill[]; skillsVersion: string | null };
   }
 
   /**
-   * Call a tool on any gateway for the given organization that provides the
+   * Call a tool on any bastion for the given organization that provides the
    * requested integration. Picks a random candidate for load balancing and
    * retries on a different one if the call fails with a connection error.
    */
@@ -293,11 +293,11 @@ export class GatewayServer {
     args: Record<string, unknown>,
     timeoutMs = 90_000
   ): Promise<ToolResult> {
-    const candidates: GatewayEntry[] = [];
-    for (const entry of this.gateways.values()) {
+    const candidates: BastionEntry[] = [];
+    for (const entry of this.bastions.values()) {
       if (
-        entry.gateway.organizationId === organizationId &&
-        entry.gateway.integrations.some((i) => i.id === integrationId)
+        entry.bastion.organizationId === organizationId &&
+        entry.bastion.integrations.some((i) => i.id === integrationId)
       ) {
         candidates.push(entry);
       }
@@ -305,7 +305,7 @@ export class GatewayServer {
 
     if (candidates.length === 0) {
       throw new Error(
-        `No gateway for org "${organizationId}" has integration "${integrationId}"`
+        `No bastion for org "${organizationId}" has integration "${integrationId}"`
       );
     }
 
@@ -328,17 +328,17 @@ export class GatewayServer {
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         // Only retry on connection-level errors
-        if (!lastError.message.includes("Gateway disconnected")) {
+        if (!lastError.message.includes("Bastion disconnected")) {
           throw lastError;
         }
       }
     }
 
-    throw lastError ?? new Error("All gateway candidates failed");
+    throw lastError ?? new Error("All bastion candidates failed");
   }
 
   private callToolOnEntry(
-    entry: GatewayEntry,
+    entry: BastionEntry,
     integrationId: string,
     toolName: string,
     args: Record<string, unknown>,
@@ -373,10 +373,10 @@ export class GatewayServer {
     });
   }
 
-  private sendPull(gatewayId: string, type: string): Promise<unknown> {
-    const entry = this.gateways.get(gatewayId);
+  private sendPull(bastionId: string, type: string): Promise<unknown> {
+    const entry = this.bastions.get(bastionId);
     if (!entry) {
-      return Promise.reject(new Error(`Gateway "${gatewayId}" not found`));
+      return Promise.reject(new Error(`Bastion "${bastionId}" not found`));
     }
 
     const requestId = `pull_${++this.pullCounter}`;
@@ -394,7 +394,7 @@ export class GatewayServer {
   }
 
   private resolvePull(connId: string, requestId: string, data: unknown): void {
-    const entry = this.gateways.get(connId);
+    const entry = this.bastions.get(connId);
     if (!entry) return;
     const pull = entry.pendingPulls.get(requestId);
     if (pull) {
@@ -404,25 +404,25 @@ export class GatewayServer {
     }
   }
 
-  private reportSocketError(error: unknown, gateway: ConnectedGateway | null): void {
+  private reportSocketError(error: unknown, bastion: ConnectedBastion | null): void {
     const normalized = error instanceof Error ? error : new Error(String(error));
     try {
-      this.options.onSocketError?.(normalized, gateway);
+      this.options.onSocketError?.(normalized, bastion);
     } catch {
       // Diagnostic callbacks are user code; never let them crash the host.
     }
   }
 
   private async autoPull(connId: string): Promise<void> {
-    const entry = this.gateways.get(connId);
+    const entry = this.bastions.get(connId);
     if (!entry) return;
 
     const pulls: Promise<void>[] = [];
 
-    if (entry.gateway.mcpVersion !== null) {
+    if (entry.bastion.mcpVersion !== null) {
       pulls.push(this.pullTools(connId));
     }
-    if (entry.gateway.skillsVersion !== null) {
+    if (entry.bastion.skillsVersion !== null) {
       pulls.push(this.pullSkills(connId));
     }
 
@@ -430,7 +430,7 @@ export class GatewayServer {
   }
 
   private async pullTools(connId: string): Promise<void> {
-    const entry = this.gateways.get(connId);
+    const entry = this.bastions.get(connId);
     if (!entry) return;
 
     const data = await this.sendPull(connId, "get_tools") as {
@@ -438,15 +438,15 @@ export class GatewayServer {
       mcpVersion: string | null;
     };
 
-    entry.gateway.integrations = [
+    entry.bastion.integrations = [
       ...data.integrations,
-      ...entry.gateway.integrations.filter((i) => i.id === "skills"),
+      ...entry.bastion.integrations.filter((i) => i.id === "skills"),
     ];
-    entry.gateway.mcpVersion = data.mcpVersion;
+    entry.bastion.mcpVersion = data.mcpVersion;
   }
 
   private async pullSkills(connId: string): Promise<void> {
-    const entry = this.gateways.get(connId);
+    const entry = this.bastions.get(connId);
     if (!entry) return;
 
     const data = await this.sendPull(connId, "get_skills") as {
@@ -455,22 +455,22 @@ export class GatewayServer {
     };
 
     // Build skills integration if any skills exist
-    const nonSkillIntegrations = entry.gateway.integrations.filter((i) => i.id !== "skills");
+    const nonSkillIntegrations = entry.bastion.integrations.filter((i) => i.id !== "skills");
     if (data.skills.length > 0) {
       nonSkillIntegrations.push({
         id: "skills",
         name: "Skills",
-        description: "Gateway skills",
+        description: "Bastion skills",
         tools: [],
         skills: data.skills,
       });
     }
-    entry.gateway.integrations = nonSkillIntegrations;
-    entry.gateway.skillsVersion = data.skillsVersion;
+    entry.bastion.integrations = nonSkillIntegrations;
+    entry.bastion.skillsVersion = data.skillsVersion;
   }
 
   /**
-   * Handle a new gateway WebSocket connection.
+   * Handle a new bastion WebSocket connection.
    *
    * Called automatically for connections received by the internal
    * WebSocketServer when using {@link start}. Call this manually to feed
@@ -492,7 +492,7 @@ export class GatewayServer {
     const handleMessage = async (data: RawData): Promise<void> => {
       let msg;
       try {
-        msg = GatewayMessageSchema.parse(JSON.parse(data.toString()));
+        msg = BastionMessageSchema.parse(JSON.parse(data.toString()));
       } catch {
         return;
       }
@@ -537,21 +537,21 @@ export class GatewayServer {
           const mcpVersion = msg.mcpVersion;
           const skillsVersion = msg.skillsVersion;
 
-          const existing = this.gateways.get(connId);
+          const existing = this.bastions.get(connId);
           if (existing) {
             // Subsequent version_changed: update versions and pull what changed
-            const mcpChanged = mcpVersion !== existing.gateway.mcpVersion;
-            const skillsChanged = skillsVersion !== existing.gateway.skillsVersion;
+            const mcpChanged = mcpVersion !== existing.bastion.mcpVersion;
+            const skillsChanged = skillsVersion !== existing.bastion.skillsVersion;
 
-            existing.gateway.mcpVersion = mcpVersion;
-            existing.gateway.skillsVersion = skillsVersion;
+            existing.bastion.mcpVersion = mcpVersion;
+            existing.bastion.skillsVersion = skillsVersion;
 
             const pulls: Promise<void>[] = [];
             if (mcpChanged && mcpVersion !== null) {
               pulls.push(this.pullTools(connId));
             } else if (mcpChanged && mcpVersion === null) {
               // MCP removed: clear tool integrations
-              existing.gateway.integrations = existing.gateway.integrations.filter(
+              existing.bastion.integrations = existing.bastion.integrations.filter(
                 (i) => i.id === "skills"
               );
             }
@@ -559,7 +559,7 @@ export class GatewayServer {
               pulls.push(this.pullSkills(connId));
             } else if (skillsChanged && skillsVersion === null) {
               // Skills removed: clear skills integrations
-              existing.gateway.integrations = existing.gateway.integrations.filter(
+              existing.bastion.integrations = existing.bastion.integrations.filter(
                 (i) => i.id !== "skills"
               );
             }
@@ -567,10 +567,10 @@ export class GatewayServer {
             if (pulls.length > 0) {
               await Promise.all(pulls);
             }
-            this.onGatewayUpdated?.(existing.gateway);
+            this.onBastionUpdated?.(existing.bastion);
           } else {
-            // First version_changed: create gateway entry, auto-pull, then fire connected
-            const gateway: ConnectedGateway = {
+            // First version_changed: create bastion entry, auto-pull, then fire connected
+            const bastion: ConnectedBastion = {
               id: connId,
               organizationId,
               protocolVersion,
@@ -580,24 +580,24 @@ export class GatewayServer {
               skillsVersion,
             };
 
-            const entry: GatewayEntry = {
+            const entry: BastionEntry = {
               ws,
-              gateway,
+              bastion,
               pending: new Map(),
               pendingPulls: new Map(),
               pongTimer: null,
             };
 
-            this.gateways.set(connId, entry);
+            this.bastions.set(connId, entry);
 
             await this.autoPull(connId);
-            this.onGatewayConnected?.(gateway);
+            this.onBastionConnected?.(bastion);
           }
           break;
         }
 
         case "tool_result": {
-          const entry = this.gateways.get(connId);
+          const entry = this.bastions.get(connId);
           if (!entry) return;
           const pending = entry.pending.get(msg.requestId);
           if (pending) {
@@ -609,7 +609,7 @@ export class GatewayServer {
         }
 
         case "tool_error": {
-          const entry = this.gateways.get(connId);
+          const entry = this.bastions.get(connId);
           if (!entry) return;
           const pending = entry.pending.get(msg.requestId);
           if (pending) {
@@ -625,7 +625,7 @@ export class GatewayServer {
         }
 
         case "pong": {
-          const entry = this.gateways.get(connId);
+          const entry = this.bastions.get(connId);
           if (entry?.pongTimer) {
             clearTimeout(entry.pongTimer);
             entry.pongTimer = null;
@@ -661,38 +661,38 @@ export class GatewayServer {
 
     ws.on("message", (data) => {
       void handleMessage(data).catch((err) => {
-        this.reportSocketError(err, this.gateways.get(connId)?.gateway ?? null);
+        this.reportSocketError(err, this.bastions.get(connId)?.bastion ?? null);
         ws.close();
       });
     });
 
     // An "error" event with no listener crashes the host process.
     ws.on("error", (err: Error) => {
-      this.reportSocketError(err, this.gateways.get(connId)?.gateway ?? null);
+      this.reportSocketError(err, this.bastions.get(connId)?.bastion ?? null);
     });
 
     ws.on("close", (code: number, reason: Buffer) => {
       clearTimeout(authTimer);
-      const entry = this.gateways.get(connId);
+      const entry = this.bastions.get(connId);
       if (entry) {
         if (entry.pongTimer) clearTimeout(entry.pongTimer);
         for (const pending of entry.pending.values()) {
           clearTimeout(pending.timer);
-          pending.reject(new Error("Gateway disconnected"));
+          pending.reject(new Error("Bastion disconnected"));
         }
         for (const pull of entry.pendingPulls.values()) {
           clearTimeout(pull.timer);
-          pull.reject(new Error("Gateway disconnected"));
+          pull.reject(new Error("Bastion disconnected"));
         }
-        this.gateways.delete(connId);
+        this.bastions.delete(connId);
         const reasonStr = reason?.toString() || undefined;
-        this.onGatewayDisconnected?.(entry.gateway, code, reasonStr);
+        this.onBastionDisconnected?.(entry.bastion, code, reasonStr);
       }
     });
   }
 
   private sendPings(): void {
-    for (const entry of this.gateways.values()) {
+    for (const entry of this.bastions.values()) {
       entry.ws.send(JSON.stringify({ type: "ping" }));
       if (entry.pongTimer) clearTimeout(entry.pongTimer);
       entry.pongTimer = setTimeout(() => {

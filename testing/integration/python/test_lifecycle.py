@@ -4,41 +4,41 @@ import os
 
 import pytest
 
-from journal_gateway_client import GatewayServer, TokenValidationResult
+from journal_bastion_client import BastionServer, TokenValidationResult
 
 
-GATEWAY_BIN = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "gateway", "dist", "main.js"
+BASTION_BIN = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "bastion", "dist", "main.js"
 )
 
 
 @pytest.mark.asyncio
-async def test_gateway_connects(server_and_gateway):
-    server = server_and_gateway
-    assert len(server.connected_gateways) == 1
-    assert len(server.connected_gateways[0].integrations) == 0
+async def test_bastion_connects(server_and_bastion):
+    server = server_and_bastion
+    assert len(server.connected_bastions) == 1
+    assert len(server.connected_bastions[0].integrations) == 0
 
 
 @pytest.mark.asyncio
-async def test_gateway_version_info(server_and_gateway):
-    server = server_and_gateway
-    gw = server.connected_gateways[0]
+async def test_bastion_version_info(server_and_bastion):
+    server = server_and_bastion
+    gw = server.connected_bastions[0]
     assert gw.protocol_version == 2
-    assert gw.gateway_version  # should be non-empty
+    assert gw.bastion_version  # should be non-empty
 
 
 @pytest.mark.asyncio
-async def test_gateway_versions_null_with_no_config(server_and_gateway):
-    server = server_and_gateway
-    gw = server.connected_gateways[0]
+async def test_bastion_versions_null_with_no_config(server_and_bastion):
+    server = server_and_bastion
+    gw = server.connected_bastions[0]
     assert gw.mcp_version is None
     assert gw.skills_version is None
 
 
 @pytest.mark.asyncio
-async def test_pull_versions(server_and_gateway):
-    server = server_and_gateway
-    gw = server.connected_gateways[0]
+async def test_pull_versions(server_and_bastion):
+    server = server_and_bastion
+    gw = server.connected_bastions[0]
     versions = await server.get_versions(gw.id)
     assert versions["mcpVersion"] is None
     assert versions["skillsVersion"] is None
@@ -51,16 +51,16 @@ async def test_rejects_invalid_token():
             return TokenValidationResult(organization_id="org_1")
         return None
 
-    server = GatewayServer(validate_token=validate, port=0, ping_interval=0)
+    server = BastionServer(validate_token=validate, port=0, ping_interval=0)
     await server.start()
 
     proc = subprocess.Popen(
-        ["node", GATEWAY_BIN],
+        ["node", BASTION_BIN],
         env={
             **os.environ,
-            "JOURNAL_GATEWAY_TOKEN": "gw_wrong",
-            "JOURNAL_GATEWAY_URL": server.url,
-            "JOURNAL_GATEWAY_CONFIG": "{}",
+            "JOURNAL_BASTION_TOKEN": "gw_wrong",
+            "JOURNAL_BASTION_URL": server.url,
+            "JOURNAL_BASTION_CONFIG": "{}",
             "LOG_LEVEL": "error",
         },
         stdout=subprocess.PIPE,
@@ -78,7 +78,7 @@ async def test_rejects_invalid_token():
             await asyncio.sleep(0.1)
         if code is None:
             proc.kill()
-            pytest.fail("Gateway did not exit after invalid token")
+            pytest.fail("Bastion did not exit after invalid token")
         assert code != 0
     finally:
         await server.stop()
@@ -89,18 +89,18 @@ async def test_detects_disconnect():
     async def validate(token: str) -> TokenValidationResult | None:
         return TokenValidationResult(organization_id="org_1") if token == "gw_test" else None
 
-    server = GatewayServer(validate_token=validate, port=0, ping_interval=0)
+    server = BastionServer(validate_token=validate, port=0, ping_interval=0)
     disconnected = asyncio.Event()
-    server.on_gateway_disconnected = lambda _gw: disconnected.set()
+    server.on_bastion_disconnected = lambda _gw: disconnected.set()
     await server.start()
 
     proc = subprocess.Popen(
-        ["node", GATEWAY_BIN],
+        ["node", BASTION_BIN],
         env={
             **os.environ,
-            "JOURNAL_GATEWAY_TOKEN": "gw_test",
-            "JOURNAL_GATEWAY_URL": server.url,
-            "JOURNAL_GATEWAY_CONFIG": "{}",
+            "JOURNAL_BASTION_TOKEN": "gw_test",
+            "JOURNAL_BASTION_URL": server.url,
+            "JOURNAL_BASTION_CONFIG": "{}",
             "LOG_LEVEL": "error",
         },
         stdout=subprocess.PIPE,
@@ -108,14 +108,14 @@ async def test_detects_disconnect():
     )
     try:
         for _ in range(100):
-            if server.connected_gateways:
+            if server.connected_bastions:
                 break
             await asyncio.sleep(0.1)
-        assert len(server.connected_gateways) == 1
+        assert len(server.connected_bastions) == 1
 
         proc.terminate()
         await asyncio.wait_for(disconnected.wait(), timeout=10)
-        assert len(server.connected_gateways) == 0
+        assert len(server.connected_bastions) == 0
     finally:
         if proc.poll() is None:
             proc.kill()

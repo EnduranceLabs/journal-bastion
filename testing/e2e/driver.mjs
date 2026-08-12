@@ -1,12 +1,12 @@
-// End-to-end driver: real client server + real gateway + real Toolbox MCP
+// End-to-end driver: real client server + real bastion + real Toolbox MCP
 // server + real database. No mocks.
 //
 //   node driver.mjs <configPath> <envFilePath> <integrationId> <readSql> <writeSql> <expectedCountsJson>
 //
 // It:
-//   1. starts a GatewayServer (the Journal "service" side) on ws://127.0.0.1:8080
-//   2. spawns `journal-gateway` pointed at it with the given config + env file
-//   3. waits for the gateway to connect and auto-publish its MCP tools
+//   1. starts a BastionServer (the Journal "service" side) on ws://127.0.0.1:8080
+//   2. spawns `journal-bastion` pointed at it with the given config + env file
+//   3. waits for the bastion to connect and auto-publish its MCP tools
 //   4. prints the integrations + tool schemas it received
 //   5. calls execute_sql with a read query (expects success + rows)
 //   6. calls execute_sql with a write query (expects a read-only failure)
@@ -16,11 +16,11 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { GatewayServer } from "../../clients/typescript/dist/server.js";
+import { BastionServer } from "../../clients/typescript/dist/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
-const GATEWAY_BIN = path.join(REPO, "gateway", "dist", "main.js");
+const BASTION_BIN = path.join(REPO, "bastion", "dist", "main.js");
 
 const [, , configPath, envFilePath, integrationId, readSql, writeSql] =
   process.argv;
@@ -87,17 +87,17 @@ async function waitFor(check, ms, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-const server = new GatewayServer({
+const server = new BastionServer({
   port: PORT,
   pingIntervalMs: 0,
   validateToken: async (t) =>
     t === TOKEN ? { organizationId: "org_e2e" } : null,
 });
 
-let gatewayProc;
+let bastionProc;
 async function cleanup() {
   try {
-    gatewayProc?.kill("SIGTERM");
+    bastionProc?.kill("SIGTERM");
   } catch {}
   try {
     await server.stop();
@@ -111,26 +111,26 @@ try {
   log(`service listening on ${server.url}`);
 
   const connected = new Promise((resolve) => {
-    server.onGatewayConnected = (gw) => resolve(gw);
+    server.onBastionConnected = (gw) => resolve(gw);
   });
 
-  gatewayProc = spawn(
+  bastionProc = spawn(
     "node",
-    [GATEWAY_BIN, "--env-file", envFilePath, "--config", configPath],
+    [BASTION_BIN, "--env-file", envFilePath, "--config", configPath],
     { env: { ...process.env, LOG_LEVEL: "info" }, stdio: "inherit" }
   );
-  gatewayProc.on("exit", (code) =>
-    log(`gateway process exited with code ${code}`)
+  bastionProc.on("exit", (code) =>
+    log(`bastion process exited with code ${code}`)
   );
 
-  log("waiting for gateway to connect (npx may download Toolbox on first run)...");
-  const gw = await Promise.race([connected, deadline(90_000, "gateway connect")]);
-  log(`gateway connected: id=${gw.id}`);
+  log("waiting for bastion to connect (npx may download Toolbox on first run)...");
+  const gw = await Promise.race([connected, deadline(90_000, "bastion connect")]);
+  log(`bastion connected: id=${gw.id}`);
 
   // Tools are auto-pulled after version_changed; poll until they arrive.
   const withTools = await waitFor(
     () => {
-      const g = server.connectedGateways.find((c) => c.id === gw.id);
+      const g = server.connectedBastions.find((c) => c.id === gw.id);
       return g && g.integrations.length > 0 ? g : null;
     },
     90_000,

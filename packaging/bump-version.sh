@@ -13,7 +13,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 # Replace only the version line so package.json formatting is preserved.
-for pkg in protocol gateway clients/typescript; do
+for pkg in protocol bastion clients/typescript; do
   sed -i.bak -E "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$pkg/package.json"
   rm -f "$pkg/package.json.bak"
   echo "  $pkg/package.json -> $VERSION"

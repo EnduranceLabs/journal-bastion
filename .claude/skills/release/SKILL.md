@@ -1,11 +1,11 @@
 ---
 name: release
-description: Publish Journal Gateway release artifacts to npm, PyPI, GHCR Docker, and Homebrew
+description: Publish Journal Bastion release artifacts to npm, PyPI, GHCR Docker, and Homebrew
 disable-model-invocation: true
 argument-hint: "[version]"
 ---
 
-# Release Journal Gateway
+# Release Journal Bastion
 
 Use `packaging/npm/README.md` as the canonical release runbook. This skill is a
 guardrail for the parts that are easy to miss during an agent-led release.
@@ -26,7 +26,7 @@ git push origin "v$VERSION"
 1. Publish npm packages with `packaging/npm/publish.sh`.
 2. Publish the Python client with `packaging/pypi/publish.sh`.
 3. Publish the Docker image with `TAG=<version> ./packaging/docker/publish.sh`.
-4. Move `ghcr.io/endurancelabs/journal-gateway:latest` to the same image digest.
+4. Move `ghcr.io/endurancelabs/journal-bastion:latest` to the same image digest.
 5. Update the Homebrew formula with `VERSION=<version> ./packaging/homebrew/publish.sh`.
 
 ## Auth and failure handling

@@ -6,19 +6,19 @@ export type {
   TextContent,
   ImageContent,
   Skill,
-  GatewayError,
-  GatewayErrorCode,
-  GatewayMessage,
+  BastionError,
+  BastionErrorCode,
+  BastionMessage,
   VersionChangedMessage,
   VersionsMessage,
   ToolsMessage,
   SkillsMessage,
-  GatewayVersions,
+  BastionVersions,
   ServiceMessage,
-} from "journal-gateway-protocol";
+} from "journal-bastion-protocol";
 
 export {
-  GatewayMessageSchema,
+  BastionMessageSchema,
   VersionChangedMessageSchema,
   VersionsMessageSchema,
   ToolsMessageSchema,
@@ -26,4 +26,4 @@ export {
   ServiceMessageSchema,
   IntegrationSchema,
   ToolResultSchema,
-} from "journal-gateway-protocol";
+} from "journal-bastion-protocol";

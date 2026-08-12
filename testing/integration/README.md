@@ -1,6 +1,6 @@
 # Integration Tests
 
-These tests run the real gateway process against the service-side client
+These tests run the real bastion process against the service-side client
 libraries with no MCP servers configured. They verify connection lifecycle,
 authentication, version pulls, and disconnect handling.
 
@@ -8,8 +8,8 @@ authentication, version pulls, and disconnect handling.
 
 | Path | What it covers | Root command |
 |------|----------------|--------------|
-| [`ts/`](./ts) | TypeScript client library with the real gateway | `pnpm test:integration` |
-| [`python/`](./python) | Python client library with the real gateway | none; run manually |
+| [`ts/`](./ts) | TypeScript client library with the real bastion | `pnpm test:integration` |
+| [`python/`](./python) | Python client library with the real bastion | none; run manually |
 
 `pnpm test:all` includes the TypeScript integration suite through
 `pnpm test:integration`. The Python integration suite is separate from the root
@@ -17,7 +17,7 @@ scripts.
 
 ## Run manually
 
-Build the gateway first:
+Build the bastion first:
 
 ```bash
 pnpm -r build

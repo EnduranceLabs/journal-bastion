@@ -1,6 +1,6 @@
 ---
 name: dev
-description: Development commands and workflows for the journal-gateway project
+description: Development commands and workflows for the journal-bastion project
 user-invocable: false
 ---
 
@@ -15,11 +15,11 @@ architecture lives in `ARCHITECTURE.md`. The command reference below mirrors
 All commands run from the repository root:
 
 ```bash
-pnpm build            # build protocol and gateway
-pnpm typecheck        # protocol, gateway, and TS client
-pnpm test             # gateway tests
+pnpm build            # build protocol and bastion
+pnpm typecheck        # protocol, bastion, and TS client
+pnpm test             # bastion tests
 pnpm test:client      # TypeScript client tests
-pnpm test:integration # TypeScript integration (gateway <-> TS client)
+pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 pnpm test:all         # root-script suites above
 testing/e2e/run-all.sh # Docker database end-to-end tests (requires Docker)
@@ -33,7 +33,7 @@ See `ARCHITECTURE.md`.
 
 See `ARCHITECTURE.md` for the current module list. For protocol message work,
 start with `protocol/src/messages.ts`, `protocol/src/index.ts`,
-`spec/protocol.md`, and `gateway/src/__tests__/messages.test.ts`.
+`spec/protocol.md`, and `bastion/src/__tests__/messages.test.ts`.
 
 ## Testing Patterns
 
@@ -42,10 +42,10 @@ Tests use **vitest**. Run tests:
 ```bash
 pnpm test
 # or directly:
-cd gateway && pnpm test
+cd bastion && pnpm test
 ```
 
-`pnpm test` is the gateway test suite, not every test in the repo. Use
+`pnpm test` is the bastion test suite, not every test in the repo. Use
 `pnpm test:all` for the root-script suites and `testing/e2e/run-all.sh` for the
 Docker database end-to-end tests.
 
@@ -57,7 +57,7 @@ Docker database end-to-end tests.
 
 ### Process event testing
 
-The gateway uses `EventEmitter` patterns for process lifecycle. Tests verify
+The bastion uses `EventEmitter` patterns for process lifecycle. Tests verify
 events like connection state changes, catalog updates, and tool call handling.
 
 ## Code Conventions

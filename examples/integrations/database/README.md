@@ -1,17 +1,17 @@
 # Database Access Examples
 
-These examples show how to expose SQL databases through Journal Gateway using
+These examples show how to expose SQL databases through Journal Bastion using
 [Google MCP Toolbox for Databases](https://github.com/googleapis/mcp-toolbox).
 Toolbox is an open source MCP server for databases with prebuilt tools such as
 `list_tables` and `execute_sql`, plus a custom-tools framework for restricted
 queries.
 
-The gateway does not need database credentials itself. It starts the MCP server
+The bastion does not need database credentials itself. It starts the MCP server
 inside your network and passes only the environment variables that MCP server
 needs. Credentials stay in your infrastructure.
 
 These examples do not have their own npm package and do not add database MCP
-servers as dependencies of Journal Gateway. The `@toolbox-sdk/server` package is
+servers as dependencies of Journal Bastion. The `@toolbox-sdk/server` package is
 referenced as an external runtime command through `npx -y`.
 
 ## Example Configs
@@ -26,28 +26,28 @@ referenced as an external runtime command through `npx -y`.
 Run one example:
 
 ```bash
-JOURNAL_GATEWAY_TOKEN=gw_your_token \
+JOURNAL_BASTION_TOKEN=gw_your_token \
 POSTGRES_HOST=db.internal.example.com \
 POSTGRES_PORT=5432 \
 POSTGRES_DATABASE=analytics \
-POSTGRES_USER=journal_gateway_ro \
+POSTGRES_USER=journal_bastion_ro \
 POSTGRES_PASSWORD='replace-me' \
-journal-gateway --config examples/integrations/database/toolbox-postgres.json
+journal-bastion --config examples/integrations/database/toolbox-postgres.json
 ```
 
 For production, put the environment variables in a local env file and pass it
-with `--env-file /etc/journal/gateway.env`.
+with `--env-file /etc/journal/bastion.env`.
 
 ## Recommended Access Model
 
 Database MCP servers can usually expose an `execute_sql` tool. Treat the database
 account as the enforcement boundary:
 
-- create a dedicated account for Journal Gateway;
+- create a dedicated account for Journal Bastion;
 - grant only the schemas, tables, views, or warehouses the agent should see;
 - prefer views over base tables when columns or rows need to be hidden;
 - use read replicas for analytical access when possible;
-- restrict the account to the gateway host or private network path;
+- restrict the account to the bastion host or private network path;
 - require TLS for database connections when traffic crosses hosts or networks;
 - set statement timeouts and resource limits;
 - rotate credentials on the same schedule as other service credentials;
@@ -64,8 +64,8 @@ Use this rollout checklist:
 1. Create the database role/user with no default admin or write privileges.
 2. Grant read access only to the intended schema, table, view, or warehouse.
 3. Run the verification commands below as the new user.
-4. Store credentials in the gateway host environment or env file.
-5. Start the gateway with the matching example config.
+4. Store credentials in the bastion host environment or env file.
+5. Start the bastion with the matching example config.
 6. Review database audit logs for the dedicated account after first use.
 
 ## PostgreSQL Read-Only User
@@ -75,19 +75,19 @@ Run default-privilege statements as the role that owns future objects, or add
 `FOR ROLE <owner_role>` when your DBA manages grants centrally:
 
 ```sql
-CREATE ROLE journal_gateway_ro LOGIN PASSWORD 'replace-me';
+CREATE ROLE journal_bastion_ro LOGIN PASSWORD 'replace-me';
 
-GRANT CONNECT ON DATABASE analytics TO journal_gateway_ro;
+GRANT CONNECT ON DATABASE analytics TO journal_bastion_ro;
 \c analytics
 
-GRANT USAGE ON SCHEMA reporting TO journal_gateway_ro;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO journal_gateway_ro;
+GRANT USAGE ON SCHEMA reporting TO journal_bastion_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO journal_bastion_ro;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA reporting
-  GRANT SELECT ON TABLES TO journal_gateway_ro;
+  GRANT SELECT ON TABLES TO journal_bastion_ro;
 
-ALTER ROLE journal_gateway_ro SET default_transaction_read_only = on;
-ALTER ROLE journal_gateway_ro SET statement_timeout = '30s';
+ALTER ROLE journal_bastion_ro SET default_transaction_read_only = on;
+ALTER ROLE journal_bastion_ro SET statement_timeout = '30s';
 ```
 
 For restricted access, create views in a dedicated schema and grant access only
@@ -101,8 +101,8 @@ SELECT id, plan, created_at
 FROM app.customers
 WHERE deleted_at IS NULL;
 
-GRANT USAGE ON SCHEMA journal_ai TO journal_gateway_ro;
-GRANT SELECT ON journal_ai.customer_summary TO journal_gateway_ro;
+GRANT USAGE ON SCHEMA journal_ai TO journal_bastion_ro;
+GRANT SELECT ON journal_ai.customer_summary TO journal_bastion_ro;
 ```
 
 Verify with the dedicated user:
@@ -120,15 +120,15 @@ The `SELECT` should work. The `CREATE TABLE` and `INSERT` should fail.
 ## MySQL Read-Only User
 
 Grant `SELECT` only on the database or on specific tables/views. Replace
-`gateway-host.example.com` with the hostname or host pattern your gateway uses
+`bastion-host.example.com` with the hostname or host pattern your bastion uses
 to reach MySQL:
 
 ```sql
-CREATE USER 'journal_gateway_ro'@'gateway-host.example.com'
+CREATE USER 'journal_bastion_ro'@'bastion-host.example.com'
   IDENTIFIED BY 'replace-me';
 
-GRANT SELECT ON analytics.* TO 'journal_gateway_ro'@'gateway-host.example.com';
-ALTER USER 'journal_gateway_ro'@'gateway-host.example.com'
+GRANT SELECT ON analytics.* TO 'journal_bastion_ro'@'bastion-host.example.com';
+ALTER USER 'journal_bastion_ro'@'bastion-host.example.com'
   WITH MAX_USER_CONNECTIONS 5;
 ```
 
@@ -156,12 +156,12 @@ table and view in the database:
 
 ```sql
 USE master;
-CREATE LOGIN journal_gateway_ro WITH PASSWORD = 'replace-me';
+CREATE LOGIN journal_bastion_ro WITH PASSWORD = 'replace-me';
 
 USE analytics;
-CREATE USER journal_gateway_ro FOR LOGIN journal_gateway_ro;
-ALTER ROLE db_datareader ADD MEMBER journal_gateway_ro;
-GRANT VIEW DEFINITION TO journal_gateway_ro;
+CREATE USER journal_bastion_ro FOR LOGIN journal_bastion_ro;
+ALTER ROLE db_datareader ADD MEMBER journal_bastion_ro;
+GRANT VIEW DEFINITION TO journal_bastion_ro;
 ```
 
 For restricted access, skip `db_datareader` and grant `SELECT` on a schema or
@@ -177,7 +177,7 @@ FROM dbo.customers
 WHERE deleted_at IS NULL;
 GO
 
-GRANT SELECT ON SCHEMA::journal_ai TO journal_gateway_ro;
+GRANT SELECT ON SCHEMA::journal_ai TO journal_bastion_ro;
 ```
 
 Verify with the dedicated user:
@@ -198,20 +198,20 @@ Create a role with usage on a warehouse/database/schema and select access on the
 objects it should read:
 
 ```sql
-CREATE ROLE JOURNAL_GATEWAY_RO;
-CREATE USER JOURNAL_GATEWAY_RO_USER PASSWORD = 'replace-me'
-  DEFAULT_ROLE = JOURNAL_GATEWAY_RO
+CREATE ROLE JOURNAL_BASTION_RO;
+CREATE USER JOURNAL_BASTION_RO_USER PASSWORD = 'replace-me'
+  DEFAULT_ROLE = JOURNAL_BASTION_RO
   DEFAULT_WAREHOUSE = JOURNAL_AI_WH;
 
-GRANT ROLE JOURNAL_GATEWAY_RO TO USER JOURNAL_GATEWAY_RO_USER;
+GRANT ROLE JOURNAL_BASTION_RO TO USER JOURNAL_BASTION_RO_USER;
 
-GRANT USAGE ON WAREHOUSE JOURNAL_AI_WH TO ROLE JOURNAL_GATEWAY_RO;
-GRANT USAGE ON DATABASE ANALYTICS TO ROLE JOURNAL_GATEWAY_RO;
-GRANT USAGE ON SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_GATEWAY_RO;
-GRANT SELECT ON ALL TABLES IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_GATEWAY_RO;
-GRANT SELECT ON FUTURE TABLES IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_GATEWAY_RO;
-GRANT SELECT ON ALL VIEWS IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_GATEWAY_RO;
-GRANT SELECT ON FUTURE VIEWS IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_GATEWAY_RO;
+GRANT USAGE ON WAREHOUSE JOURNAL_AI_WH TO ROLE JOURNAL_BASTION_RO;
+GRANT USAGE ON DATABASE ANALYTICS TO ROLE JOURNAL_BASTION_RO;
+GRANT USAGE ON SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_BASTION_RO;
+GRANT SELECT ON ALL TABLES IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_BASTION_RO;
+GRANT SELECT ON FUTURE TABLES IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_BASTION_RO;
+GRANT SELECT ON ALL VIEWS IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_BASTION_RO;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA ANALYTICS.REPORTING TO ROLE JOURNAL_BASTION_RO;
 ```
 
 Use a small warehouse with an auto-suspend policy for agent workloads.
@@ -220,7 +220,7 @@ Verify with the dedicated user and role. Replace `ALLOWED_TABLE_OR_VIEW` with
 an object the role should be able to read:
 
 ```sql
-USE ROLE JOURNAL_GATEWAY_RO;
+USE ROLE JOURNAL_BASTION_RO;
 USE WAREHOUSE JOURNAL_AI_WH;
 USE DATABASE ANALYTICS;
 USE SCHEMA REPORTING;
@@ -249,7 +249,7 @@ Toolbox also supports loading a narrower toolset with the
 model.
 
 For production workflows that should only run approved queries, create a Toolbox
-`tools.yaml` with custom parameterized SQL tools and point the gateway entry at:
+`tools.yaml` with custom parameterized SQL tools and point the bastion entry at:
 
 ```json
 {

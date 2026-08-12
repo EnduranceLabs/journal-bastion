@@ -1,23 +1,23 @@
 ---
 name: add-message
-description: Add a new message type to the gateway protocol
+description: Add a new message type to the bastion protocol
 disable-model-invocation: true
-argument-hint: "[message-name] [direction: gateway|service]"
+argument-hint: "[message-name] [direction: bastion|service]"
 ---
 
 # Add a Protocol Message Type
 
-Follow these steps to add a new message to the Journal Gateway Protocol.
+Follow these steps to add a new message to the Journal Bastion Protocol.
 
-The first argument is the message name (e.g., `heartbeat_ack`). The second argument is the direction: `gateway` (gateway -> service) or `service` (service -> gateway).
+The first argument is the message name (e.g., `heartbeat_ack`). The second argument is the direction: `bastion` (bastion -> service) or `service` (service -> bastion).
 
 ## 1. Add the Zod schema and TypeScript type
 
 Open `protocol/src/messages.ts` and add the Zod schema + type export.
 
 Place it in the correct section based on direction:
-- **Gateway -> Service:** after the existing gateway messages (before `GatewayMessageSchema`)
-- **Service -> Gateway:** after the existing service messages (before `ServiceMessageSchema`)
+- **Bastion -> Service:** after the existing bastion messages (before `BastionMessageSchema`)
+- **Service -> Bastion:** after the existing service messages (before `ServiceMessageSchema`)
 
 ```ts
 export const MyNewMessageSchema = z.object({
@@ -32,8 +32,8 @@ export type MyNewMessage = z.infer<typeof MyNewMessageSchema>;
 
 In the same file (`protocol/src/messages.ts`), add the new schema to the appropriate `z.discriminatedUnion("type", [...])`:
 
-- **Gateway -> Service:** add to `GatewayMessageSchema`
-- **Service -> Gateway:** add to `ServiceMessageSchema`
+- **Bastion -> Service:** add to `BastionMessageSchema`
+- **Service -> Bastion:** add to `ServiceMessageSchema`
 
 ## 3. Re-export from index.ts
 
@@ -51,7 +51,7 @@ export {
 
 Open `spec/protocol.md` and add documentation for the new message type.
 
-Add it under the appropriate section ("Gateway -> Service" or "Service -> Gateway"):
+Add it under the appropriate section ("Bastion -> Service" or "Service -> Bastion"):
 
 ```markdown
 #### `my_new`
@@ -68,9 +68,9 @@ If the message changes the connection lifecycle, update the ASCII diagram at the
 
 ## 5. Add tests
 
-Open `gateway/src/__tests__/messages.test.ts` and add tests.
+Open `bastion/src/__tests__/messages.test.ts` and add tests.
 
-Add in the appropriate `describe` block ("Gateway -> Service messages" or "Service -> Gateway messages"):
+Add in the appropriate `describe` block ("Bastion -> Service messages" or "Service -> Bastion messages"):
 
 ```ts
 it("parses my_new message", () => {
@@ -82,7 +82,7 @@ it("parses my_new message", () => {
 });
 ```
 
-Also verify it works through the discriminated union by adding the message to the array in the "parses all gateway/service message types via discriminated union" test.
+Also verify it works through the discriminated union by adding the message to the array in the "parses all bastion/service message types via discriminated union" test.
 
 Add rejection tests for any required fields or validation constraints:
 
@@ -98,7 +98,7 @@ it("rejects my_new with missing field1", () => {
 - TypeScript clients re-export protocol types from `clients/typescript/src/types.ts`.
   Add the new schema/type there if it should be public from the client package.
 - Python clients define their own dataclasses and message handling in
-  `clients/python/journal_gateway_client/`. Update them when the message changes
+  `clients/python/journal_bastion_client/`. Update them when the message changes
   runtime behavior or public data shapes.
 - If the message changes lifecycle, timeout, retry, trace, or catalog behavior,
   update `README.md`, `ARCHITECTURE.md`, and the relevant client README files.
@@ -107,9 +107,9 @@ it("rejects my_new with missing field1", () => {
 
 ```bash
 pnpm -r build         # Build workspace TypeScript packages
-pnpm test             # Gateway tests
+pnpm test             # Bastion tests
 pnpm test:client      # TypeScript client tests
-pnpm test:integration # TypeScript integration (gateway <-> TS client)
+pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 ```
 
@@ -119,5 +119,5 @@ pnpm test:python      # Python client tests
 - `protocol/src/messages.ts` — Zod schemas and discriminated unions
 - `protocol/src/index.ts` — Re-exports
 - `clients/typescript/src/types.ts` — Client package re-exports
-- `clients/python/journal_gateway_client/` — Python client types and handlers
-- `gateway/src/__tests__/messages.test.ts` — Message parsing tests
+- `clients/python/journal_bastion_client/` — Python client types and handlers
+- `bastion/src/__tests__/messages.test.ts` — Message parsing tests

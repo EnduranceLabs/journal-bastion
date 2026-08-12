@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { GatewayErrorSchema } from "./errors.js";
+import { BastionErrorSchema } from "./errors.js";
 import { IntegrationSchema, ToolResultSchema } from "./integrations.js";
 import { SkillSchema } from "./skills.js";
 
-// --- Gateway -> Service messages ---
+// --- Bastion -> Service messages ---
 
 export const AuthenticateMessageSchema = z.object({
   type: z.literal("authenticate"),
@@ -25,7 +25,7 @@ export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
 export const ToolErrorMessageSchema = z.object({
   type: z.literal("tool_error"),
   requestId: z.string(),
-  error: GatewayErrorSchema,
+  error: BastionErrorSchema,
 });
 
 export type ToolErrorMessage = z.infer<typeof ToolErrorMessageSchema>;
@@ -71,7 +71,7 @@ export const SkillsMessageSchema = z.object({
 
 export type SkillsMessage = z.infer<typeof SkillsMessageSchema>;
 
-export const GatewayMessageSchema = z.discriminatedUnion("type", [
+export const BastionMessageSchema = z.discriminatedUnion("type", [
   AuthenticateMessageSchema,
   ToolResultMessageSchema,
   ToolErrorMessageSchema,
@@ -82,9 +82,9 @@ export const GatewayMessageSchema = z.discriminatedUnion("type", [
   SkillsMessageSchema,
 ]);
 
-export type GatewayMessage = z.infer<typeof GatewayMessageSchema>;
+export type BastionMessage = z.infer<typeof BastionMessageSchema>;
 
-// --- Service -> Gateway messages ---
+// --- Service -> Bastion messages ---
 
 export const AuthenticatedMessageSchema = z.object({
   type: z.literal("authenticated"),

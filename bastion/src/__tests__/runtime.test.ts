@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Runtime } from "../runtime.js";
-import { IntegrationNotFoundError } from "journal-gateway-protocol";
-import type { RuntimeConfig, McpServerConfig, GatewayConfigFile } from "../config.js";
+import { IntegrationNotFoundError } from "journal-bastion-protocol";
+import type { RuntimeConfig, McpServerConfig, BastionConfigFile } from "../config.js";
 import { EventEmitter } from "node:events";
 
 // Track listeners so we can trigger events in tests
@@ -441,7 +441,7 @@ describe("Runtime hot-reload", () => {
     expect(mcpClientInstances).toHaveLength(1);
 
     // Emit config_changed with an additional server
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "test-db", name: "Test DB", description: "A test database integration", command: "npx", args: ["-y", "@test/mcp-db"], envVars: { DATABASE_URL: "DATABASE_URL" } },
         { transport: "stdio", id: "new-server", name: "New Server", description: "", command: "node", args: [], envVars: {} },
@@ -494,7 +494,7 @@ describe("Runtime hot-reload", () => {
     expect(mcpClientInstances).toHaveLength(2);
 
     // Emit config_changed with only the first server
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "test-db", name: "Test DB", description: "A test database integration", command: "npx", args: ["-y", "@test/mcp-db"], envVars: { DATABASE_URL: "DATABASE_URL" } },
       ],
@@ -533,7 +533,7 @@ describe("Runtime hot-reload", () => {
       command: "new-command",
     };
 
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "test-db", name: "Test DB", description: "A test database integration", command: "new-command", args: ["-y", "@test/mcp-db"], envVars: { DATABASE_URL: "DATABASE_URL" } },
       ],
@@ -610,7 +610,7 @@ describe("Runtime hot-reload", () => {
       throw new Error("Missing env var");
     });
 
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "bad-server", name: "Bad", description: "", command: "echo", args: [], envVars: { MISSING: "MISSING" } },
       ],
@@ -639,7 +639,7 @@ describe("Runtime hot-reload", () => {
     });
 
     // Add a new server
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "test-db", name: "Test DB", description: "A test database integration", command: "npx", args: ["-y", "@test/mcp-db"], envVars: { DATABASE_URL: "DATABASE_URL" } },
         { transport: "stdio", id: "added", name: "Added", description: "", command: "node", args: [], envVars: {} },
@@ -681,7 +681,7 @@ describe("Runtime hot-reload", () => {
     expect(mcpClientInstances).toHaveLength(1);
 
     // Config change adds a new server
-    const newConfigFile: GatewayConfigFile = {
+    const newConfigFile: BastionConfigFile = {
       mcpServers: [
         { transport: "stdio", id: "test-db", name: "Test DB", description: "A test database integration", command: "npx", args: ["-y", "@test/mcp-db"], envVars: { DATABASE_URL: "DATABASE_URL" } },
         { transport: "stdio", id: "new-server", name: "New Server", description: "", command: "node", args: [], envVars: {} },

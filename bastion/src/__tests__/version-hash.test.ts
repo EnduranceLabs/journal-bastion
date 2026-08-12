@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeVersionHash } from "../version-hash.js";
-import type { Integration } from "journal-gateway-protocol";
+import type { Integration } from "journal-bastion-protocol";
 
 describe("computeVersionHash", () => {
   it("returns null for empty array", () => {

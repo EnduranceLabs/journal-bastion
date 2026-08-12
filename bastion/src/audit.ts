@@ -13,7 +13,7 @@ type AuditEvent =
     }
   | {
       type: "message";
-      direction: "gateway_to_service" | "service_to_gateway";
+      direction: "bastion_to_service" | "service_to_bastion";
       messageType: string;
       requestId?: string;
       integrationId?: string;

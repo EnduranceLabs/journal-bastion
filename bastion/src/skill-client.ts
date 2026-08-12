@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { join, basename } from "node:path";
 import { EventEmitter } from "node:events";
-import type { Skill, Integration } from "journal-gateway-protocol";
+import type { Skill, Integration } from "journal-bastion-protocol";
 import type { Logger } from "./common/logger.js";
 
 export interface SkillClientEvents {

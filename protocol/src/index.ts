@@ -1,9 +1,9 @@
 export {
-  GATEWAY_ERROR_CODES,
-  GatewayErrorCodeSchema,
-  GatewayErrorSchema,
-  type GatewayError,
-  type GatewayErrorCode,
+  BASTION_ERROR_CODES,
+  BastionErrorCodeSchema,
+  BastionErrorSchema,
+  type BastionError,
+  type BastionErrorCode,
 } from "./errors.js";
 
 export { SkillSchema, type Skill } from "./skills.js";
@@ -32,7 +32,7 @@ export {
   VersionsMessageSchema,
   ToolsMessageSchema,
   SkillsMessageSchema,
-  GatewayMessageSchema,
+  BastionMessageSchema,
   AuthenticatedMessageSchema,
   AuthErrorMessageSchema,
   ToolCallMessageSchema,
@@ -49,7 +49,7 @@ export {
   type VersionsMessage,
   type ToolsMessage,
   type SkillsMessage,
-  type GatewayMessage,
+  type BastionMessage,
   type AuthenticatedMessage,
   type AuthErrorMessage,
   type ToolCallMessage,
@@ -60,5 +60,5 @@ export {
   type ServiceMessage,
 } from "./messages.js";
 
-export type { IntegrationProvider, GatewayConfig, GatewayVersions } from "./provider.js";
+export type { IntegrationProvider, BastionConfig, BastionVersions } from "./provider.js";
 export { IntegrationNotFoundError } from "./provider.js";

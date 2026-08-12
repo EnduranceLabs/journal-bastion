@@ -1,9 +1,9 @@
 # Publishing
 
-Internal guide for releasing the Journal Gateway packages and container image.
+Internal guide for releasing the Journal Bastion packages and container image.
 
 All packages release in **lockstep** — the same version number every time, so a
-customer can trust that the gateway, TypeScript client, protocol package, and
+customer can trust that the bastion, TypeScript client, protocol package, and
 Python client speak the same protocol when installed at the same version. Bump
 them together with the script below; never edit versions by hand. The npm and
 PyPI publish scripts run `packaging/check-lockstep.sh` and refuse to publish if
@@ -13,10 +13,10 @@ the four versions disagree.
 
 | Package | Registry | Location |
 |---------|----------|----------|
-| `journal-gateway` | npm | `gateway/` |
-| `journal-gateway-client` | npm | `clients/typescript/` |
-| `journal-gateway-protocol` | npm | `protocol/` |
-| `journal-gateway-client` | PyPI | `clients/python/` |
+| `journal-bastion` | npm | `bastion/` |
+| `journal-bastion-client` | npm | `clients/typescript/` |
+| `journal-bastion-protocol` | npm | `protocol/` |
+| `journal-bastion-client` | PyPI | `clients/python/` |
 
 ## First-time setup
 
@@ -25,7 +25,7 @@ the four versions disagree.
   older), configure a token in `~/.pypirc` (or `TWINE_*` env vars), and install
   build tools with `${PYTHON:-python3} -m pip install build twine`
 - Docker: authenticate to `ghcr.io/endurancelabs` with permission to push
-  `journal-gateway`
+  `journal-bastion`
 
 ## How to release
 
@@ -61,9 +61,9 @@ git push origin "v$VERSION"
 ./packaging/npm/publish.sh
 ```
 
-Builds all packages, then publishes `journal-gateway-protocol` first (the others
-depend on it), followed by `journal-gateway` and the npm
-`journal-gateway-client`.
+Builds all packages, then publishes `journal-bastion-protocol` first (the others
+depend on it), followed by `journal-bastion` and the npm
+`journal-bastion-client`.
 
 If npm requires browser-based authentication, run the script from an interactive
 terminal and open the URL that npm prints. A non-interactive agent session can
@@ -72,20 +72,20 @@ or more packages publish, do not rerun blindly; npm versions are immutable. Chec
 which packages are already live and publish only the missing package if needed:
 
 ```bash
-npm view journal-gateway-protocol@"$VERSION" version
-npm view journal-gateway@"$VERSION" version
-npm view journal-gateway-client@"$VERSION" version
+npm view journal-bastion-protocol@"$VERSION" version
+npm view journal-bastion@"$VERSION" version
+npm view journal-bastion-client@"$VERSION" version
 ```
 
-The npm packages were previously published as `@journal.one/gateway`,
-`@journal.one/gateway-client`, and `@journal.one/gateway-protocol`. If the old
+The npm packages were previously published as `@journal.one/bastion`,
+`@journal.one/bastion-client`, and `@journal.one/bastion-protocol`. If the old
 scoped packages are not already deprecated, deprecate them after the unscoped
 packages are published and verified:
 
 ```bash
-npm deprecate @journal.one/gateway@"<=0.7.0" "Renamed to journal-gateway. Install journal-gateway@0.8.0 or newer."
-npm deprecate @journal.one/gateway-client@"<=0.7.0" "Renamed to journal-gateway-client. Install journal-gateway-client@0.8.0 or newer."
-npm deprecate @journal.one/gateway-protocol@"<=0.7.0" "Renamed to journal-gateway-protocol. Install journal-gateway-protocol@0.8.0 or newer."
+npm deprecate @journal.one/bastion@"<=0.7.0" "Renamed to journal-bastion. Install journal-bastion@0.8.0 or newer."
+npm deprecate @journal.one/bastion-client@"<=0.7.0" "Renamed to journal-bastion-client. Install journal-bastion-client@0.8.0 or newer."
+npm deprecate @journal.one/bastion-protocol@"<=0.7.0" "Renamed to journal-bastion-protocol. Install journal-bastion-protocol@0.8.0 or newer."
 ```
 
 ### 4. Publish the Python client to PyPI
@@ -101,17 +101,17 @@ If Homebrew Python refuses package installs because the environment is externall
 managed, create a temporary release venv and point the script at it:
 
 ```bash
-python3.12 -m venv /tmp/journal-gateway-publish
-/tmp/journal-gateway-publish/bin/python -m pip install --upgrade pip build twine
-PYTHON=/tmp/journal-gateway-publish/bin/python ./packaging/pypi/publish.sh
+python3.12 -m venv /tmp/journal-bastion-publish
+/tmp/journal-bastion-publish/bin/python -m pip install --upgrade pip build twine
+PYTHON=/tmp/journal-bastion-publish/bin/python ./packaging/pypi/publish.sh
 ```
 
 ### 5. Publish the Docker image
 
 ```bash
 TAG="$VERSION" ./packaging/docker/publish.sh
-docker tag "ghcr.io/endurancelabs/journal-gateway:$VERSION" ghcr.io/endurancelabs/journal-gateway:latest
-docker push ghcr.io/endurancelabs/journal-gateway:latest
+docker tag "ghcr.io/endurancelabs/journal-bastion:$VERSION" ghcr.io/endurancelabs/journal-bastion:latest
+docker push ghcr.io/endurancelabs/journal-bastion:latest
 ```
 
 ### 6. Update the Homebrew formula
@@ -120,7 +120,7 @@ docker push ghcr.io/endurancelabs/journal-gateway:latest
 VERSION="$VERSION" ./packaging/homebrew/publish.sh
 ```
 
-Rewrites `packaging/homebrew/journal-gateway.rb` with the new tarball URL and its
+Rewrites `packaging/homebrew/journal-bastion.rb` with the new tarball URL and its
 sha256. Commit the updated formula if this repository is meant to track the
 current formula.
 
@@ -134,10 +134,10 @@ first.
 ### 7. Verify published artifacts
 
 ```bash
-npm view journal-gateway-protocol@"$VERSION" version
-npm view journal-gateway@"$VERSION" version
-npm view journal-gateway-client@"$VERSION" version
-curl -fsSL "https://pypi.org/pypi/journal-gateway-client/$VERSION/json" | jq -r '.info.version'
-docker buildx imagetools inspect "ghcr.io/endurancelabs/journal-gateway:$VERSION"
-docker buildx imagetools inspect ghcr.io/endurancelabs/journal-gateway:latest
+npm view journal-bastion-protocol@"$VERSION" version
+npm view journal-bastion@"$VERSION" version
+npm view journal-bastion-client@"$VERSION" version
+curl -fsSL "https://pypi.org/pypi/journal-bastion-client/$VERSION/json" | jq -r '.info.version'
+docker buildx imagetools inspect "ghcr.io/endurancelabs/journal-bastion:$VERSION"
+docker buildx imagetools inspect ghcr.io/endurancelabs/journal-bastion:latest
 ```

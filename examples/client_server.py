@@ -1,18 +1,18 @@
-"""Minimal Journal Gateway client server (Python).
+"""Minimal Journal Bastion client server (Python).
 
-    pip install journal-gateway-client
+    pip install journal-bastion-client
     python client_server.py
 
-Then point a gateway at ws://localhost:8080 with token "gw_demo":
+Then point a bastion at ws://localhost:8080 with token "gw_demo":
 
-    JOURNAL_GATEWAY_TOKEN=gw_demo \\
-    JOURNAL_GATEWAY_URL=ws://localhost:8080 \\
-    journal-gateway --config gateway.json
+    JOURNAL_BASTION_TOKEN=gw_demo \\
+    JOURNAL_BASTION_URL=ws://localhost:8080 \\
+    journal-bastion --config bastion.json
 """
 
 import asyncio
 
-from journal_gateway_client import GatewayServer, TokenValidationResult
+from journal_bastion_client import BastionServer, TokenValidationResult
 
 
 async def validate_token(token: str) -> TokenValidationResult | None:
@@ -21,16 +21,16 @@ async def validate_token(token: str) -> TokenValidationResult | None:
     return None
 
 
-def on_connected(gateway) -> None:
-    print(f"gateway {gateway.id} connected")
-    for integration in gateway.integrations:
+def on_connected(bastion) -> None:
+    print(f"bastion {bastion.id} connected")
+    for integration in bastion.integrations:
         print(f"  {integration.id}: {len(integration.tools)} tools")
 
 
 async def main() -> None:
-    server = GatewayServer(validate_token=validate_token, port=8080)
-    server.on_gateway_connected = on_connected
-    server.on_gateway_disconnected = lambda gw: print(f"gateway {gw.id} disconnected")
+    server = BastionServer(validate_token=validate_token, port=8080)
+    server.on_bastion_connected = on_connected
+    server.on_bastion_disconnected = lambda gw: print(f"bastion {gw.id} disconnected")
 
     await server.start()
     print("listening on ws://localhost:8080")

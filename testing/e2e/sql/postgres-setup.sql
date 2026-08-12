@@ -1,4 +1,4 @@
--- Postgres E2E fixture for Journal Gateway.
+-- Postgres E2E fixture for Journal Bastion.
 -- Runs against the `analytics` database (POSTGRES_DB) on container init.
 -- Mirrors the read-only role recipe in
 -- examples/integrations/database/README.md ("PostgreSQL Read-Only User").
@@ -37,16 +37,16 @@ FROM app.customers
 WHERE deleted_at IS NULL;
 
 -- Dedicated read-only role (verbatim shape from the docs).
-CREATE ROLE journal_gateway_ro LOGIN PASSWORD 'ro_pw';
-GRANT CONNECT ON DATABASE analytics TO journal_gateway_ro;
+CREATE ROLE journal_bastion_ro LOGIN PASSWORD 'ro_pw';
+GRANT CONNECT ON DATABASE analytics TO journal_bastion_ro;
 
-GRANT USAGE ON SCHEMA reporting TO journal_gateway_ro;
-GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO journal_gateway_ro;
+GRANT USAGE ON SCHEMA reporting TO journal_bastion_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA reporting TO journal_bastion_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA reporting
-  GRANT SELECT ON TABLES TO journal_gateway_ro;
+  GRANT SELECT ON TABLES TO journal_bastion_ro;
 
-GRANT USAGE ON SCHEMA journal_ai TO journal_gateway_ro;
-GRANT SELECT ON journal_ai.customer_summary TO journal_gateway_ro;
+GRANT USAGE ON SCHEMA journal_ai TO journal_bastion_ro;
+GRANT SELECT ON journal_ai.customer_summary TO journal_bastion_ro;
 
-ALTER ROLE journal_gateway_ro SET default_transaction_read_only = on;
-ALTER ROLE journal_gateway_ro SET statement_timeout = '30s';
+ALTER ROLE journal_bastion_ro SET default_transaction_read_only = on;
+ALTER ROLE journal_bastion_ro SET statement_timeout = '30s';

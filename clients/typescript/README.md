@@ -1,51 +1,51 @@
-# journal-gateway-client
+# journal-bastion-client
 
-TypeScript service-side library for the Journal Gateway protocol. Use this
-package in the service that accepts gateway WebSocket connections, validates
-gateway tokens, receives tool and skill catalogs, and calls tools on connected
-gateways.
+TypeScript service-side library for the Journal Bastion protocol. Use this
+package in the service that accepts bastion WebSocket connections, validates
+bastion tokens, receives tool and skill catalogs, and calls tools on connected
+bastions.
 
-If you want to run the customer-side gateway process, install
-`journal-gateway` instead.
+If you want to run the customer-side bastion process, install
+`journal-bastion` instead.
 
 ## Install
 
 Requires Node.js 22 or newer.
 
 ```bash
-npm install journal-gateway-client
+npm install journal-bastion-client
 ```
 
 ## Quick Start
 
 ```ts
-import { GatewayServer } from "journal-gateway-client";
+import { BastionServer } from "journal-bastion-client";
 
-const server = new GatewayServer({
+const server = new BastionServer({
   port: 8080,
   validateToken: async (token) => {
-    if (token === process.env.JOURNAL_GATEWAY_TOKEN) {
+    if (token === process.env.JOURNAL_BASTION_TOKEN) {
       return { organizationId: "org_123" };
     }
     return null;
   },
 });
 
-server.onGatewayConnected = (gateway) => {
-  console.info("gateway connected", {
-    gatewayId: gateway.id,
-    organizationId: gateway.organizationId,
-    integrations: gateway.integrations.length,
+server.onBastionConnected = (bastion) => {
+  console.info("bastion connected", {
+    bastionId: bastion.id,
+    organizationId: bastion.organizationId,
+    integrations: bastion.integrations.length,
   });
 };
 
-server.onGatewayUpdated = (gateway) => {
-  console.info("gateway catalog updated", { gatewayId: gateway.id });
+server.onBastionUpdated = (bastion) => {
+  console.info("bastion catalog updated", { bastionId: bastion.id });
 };
 
-server.onGatewayDisconnected = (gateway, closeCode, closeReason) => {
-  console.info("gateway disconnected", {
-    gatewayId: gateway.id,
+server.onBastionDisconnected = (bastion, closeCode, closeReason) => {
+  console.info("bastion disconnected", {
+    bastionId: bastion.id,
     closeCode,
     closeReason,
   });
@@ -53,7 +53,7 @@ server.onGatewayDisconnected = (gateway, closeCode, closeReason) => {
 
 await server.start();
 
-// After a gateway for org_123 connects and publishes the postgresql integration:
+// After a bastion for org_123 connects and publishes the postgresql integration:
 const result = await server.callToolForOrg(
   "org_123",
   "postgresql",
@@ -71,34 +71,34 @@ own logger, metrics, and tracing stack.
 - `startHeartbeat()` / `handleConnection(ws)`: use your own HTTP/WebSocket
   server and pass accepted sockets to the client library.
 - `callTool(integrationId, toolName, args, timeoutMs?)`: call a tool on any
-  connected gateway that exposes the integration.
+  connected bastion that exposes the integration.
 - `callToolForOrg(orgId, integrationId, toolName, args, timeoutMs?)`: call a
-  tool for one organization, with candidate gateway selection and retry on
+  tool for one organization, with candidate bastion selection and retry on
   connection-level failure.
 - `getToolsForOrg(orgId)`: list deduplicated tools for an organization.
-- `getVersions(gatewayId)`, `getTools(gatewayId)`, `getSkills(gatewayId)`:
-  explicitly pull catalog data from a specific gateway.
-- `connectedGateways`: inspect currently connected gateways.
+- `getVersions(bastionId)`, `getTools(bastionId)`, `getSkills(bastionId)`:
+  explicitly pull catalog data from a specific bastion.
+- `connectedBastions`: inspect currently connected bastions.
 
 ## Callbacks
 
-- `onGatewayConnected(gateway)`: fired after authentication and initial catalog
+- `onBastionConnected(bastion)`: fired after authentication and initial catalog
   pull.
-- `onGatewayUpdated(gateway)`: fired when MCP tools or skills change.
-- `onGatewayDisconnected(gateway, closeCode?, closeReason?)`: fired after a
-  connected gateway disconnects.
-- `onSocketError(error, gateway | null)`: optional constructor callback for
+- `onBastionUpdated(bastion)`: fired when MCP tools or skills change.
+- `onBastionDisconnected(bastion, closeCode?, closeReason?)`: fired after a
+  connected bastion disconnects.
+- `onSocketError(error, bastion | null)`: optional constructor callback for
   socket-level errors and unexpected connection-handler failures.
 
 ## Trace Propagation
 
-Pass `getTraceContext` when you want Journal Gateway tool execution to attach to
+Pass `getTraceContext` when you want Journal Bastion tool execution to attach to
 your active distributed trace:
 
 ```ts
 import { context, propagation } from "@opentelemetry/api";
 
-const server = new GatewayServer({
+const server = new BastionServer({
   validateToken,
   getTraceContext: () => {
     const carrier: Record<string, string> = {};
@@ -107,20 +107,20 @@ const server = new GatewayServer({
       ? { traceparent: carrier.traceparent, tracestate: carrier.tracestate }
       : null;
   },
-  onSocketError: (error, gateway) => {
-    logger.error({ error, gatewayId: gateway?.id }, "gateway connection error");
+  onSocketError: (error, bastion) => {
+    logger.error({ error, bastionId: bastion?.id }, "bastion connection error");
   },
 });
 ```
 
 `getTraceContext` is called for each tool call. The returned W3C trace context is
-sent to the gateway and used as the parent for remote tool execution spans.
+sent to the bastion and used as the parent for remote tool execution spans.
 
 ## More Documentation
 
-- [Full README](https://github.com/EnduranceLabs/journal-gateway#readme)
-- [Protocol spec](https://github.com/EnduranceLabs/journal-gateway/blob/main/spec/protocol.md)
-- [Gateway package](https://www.npmjs.com/package/journal-gateway)
+- [Full README](https://github.com/EnduranceLabs/journal-bastion#readme)
+- [Protocol spec](https://github.com/EnduranceLabs/journal-bastion/blob/main/spec/protocol.md)
+- [Bastion package](https://www.npmjs.com/package/journal-bastion)
 
 ## License
 

@@ -1,5 +1,5 @@
 packages:
   - protocol
-  - gateway
+  - bastion
   - clients/typescript
   - testing/integration/ts

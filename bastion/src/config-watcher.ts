@@ -1,10 +1,10 @@
 import { watch, type FSWatcher } from "node:fs";
 import { EventEmitter } from "node:events";
-import { readConfigFile, type GatewayConfigFile } from "./config.js";
+import { readConfigFile, type BastionConfigFile } from "./config.js";
 import type { Logger } from "./common/logger.js";
 
 export interface ConfigWatcherEvents {
-  config_changed: [config: GatewayConfigFile];
+  config_changed: [config: BastionConfigFile];
 }
 
 export class ConfigWatcher extends EventEmitter<ConfigWatcherEvents> {
@@ -44,7 +44,7 @@ export class ConfigWatcher extends EventEmitter<ConfigWatcherEvents> {
   private reload(): void {
     if (!this.filePath) return;
 
-    let configFile: GatewayConfigFile;
+    let configFile: BastionConfigFile;
     try {
       configFile = readConfigFile(this.filePath);
     } catch (err) {

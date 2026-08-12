@@ -3,39 +3,43 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { ZodError } from "zod";
-import { parseConfig, resolveConfigFilePath } from "./config.js";
+import {
+  parseConfig,
+  readBastionEnv,
+  resolveConfigFilePath,
+} from "./config.js";
 import { EnvFile } from "./env-file.js";
 import { Runtime } from "./runtime.js";
-import { GatewayConnection, AuthenticationError } from "./connection.js";
+import { BastionConnection, AuthenticationError } from "./connection.js";
 import { Logger } from "./common/logger.js";
 import { Telemetry } from "./telemetry.js";
 import { AuditLogger } from "./audit.js";
 import { VERSION } from "./version.js";
 
-const HELP = `journal-gateway ${VERSION}
+const HELP = `journal-bastion ${VERSION}
 
 Connect MCP servers and skills in your network to Journal (https://journal.one).
 
 Usage:
-  journal-gateway [--config <path>] [--env-file <path>]
+  journal-bastion [--config <path>] [--env-file <path>]
 
 Options:
-  --config <path>     Gateway config file (JSON). Overrides JOURNAL_GATEWAY_CONFIG.
-  --env-file <path>   .env file to load. Overrides JOURNAL_GATEWAY_ENV_FILE.
+  --config <path>     Bastion config file (JSON). Overrides JOURNAL_BASTION_CONFIG.
+  --env-file <path>   .env file to load. Overrides JOURNAL_BASTION_ENV_FILE.
   -h, --help          Show this help and exit.
   -v, --version       Print the version and exit.
 
 Environment:
-  JOURNAL_GATEWAY_TOKEN     Auth token from Journal (required, starts with gw_).
-  JOURNAL_GATEWAY_URL       Journal endpoint (default wss://gateway.journal.one/v1).
-  JOURNAL_GATEWAY_CONFIG    Config file path, or inline JSON.
-  JOURNAL_GATEWAY_ENV_FILE  .env file path (auto-detects ./.env if unset).
+  JOURNAL_BASTION_TOKEN     Auth token from Journal (required, starts with gw_).
+  JOURNAL_BASTION_URL       Journal endpoint (default wss://gateway.journal.one/v1).
+  JOURNAL_BASTION_CONFIG    Config file path, or inline JSON.
+  JOURNAL_BASTION_ENV_FILE  .env file path (auto-detects ./.env if unset).
   LOG_LEVEL                 debug | info | warn | error (default info).
 
 Example:
-  JOURNAL_GATEWAY_TOKEN=gw_xxx journal-gateway --config gateway.json
+  JOURNAL_BASTION_TOKEN=gw_xxx journal-bastion --config bastion.json
 
-Docs: https://github.com/EnduranceLabs/journal-gateway#readme`;
+Docs: https://github.com/EnduranceLabs/journal-bastion#readme`;
 
 function resolveEnvFilePath(
   env: Record<string, string | undefined>,
@@ -47,8 +51,8 @@ function resolveEnvFilePath(
     return argv[idx + 1];
   }
 
-  // JOURNAL_GATEWAY_ENV_FILE env var
-  const envFilePath = env.JOURNAL_GATEWAY_ENV_FILE;
+  // JOURNAL_BASTION_ENV_FILE env var
+  const envFilePath = readBastionEnv(env, "ENV_FILE");
   if (envFilePath) return envFilePath;
 
   // Auto-detect .env in cwd
@@ -95,7 +99,7 @@ async function main(): Promise<void> {
     config = parseConfig(mergedEnv, process.argv);
   } catch (err) {
     console.error(formatConfigError(err));
-    console.error("\nRun `journal-gateway --help` for usage.");
+    console.error("\nRun `journal-bastion --help` for usage.");
     process.exit(1);
   }
   const logger = new Logger(config.logLevel);
@@ -106,7 +110,7 @@ async function main(): Promise<void> {
   const telemetry = new Telemetry();
   await telemetry.start({
     endpoint: mergedEnv.OTEL_EXPORTER_OTLP_ENDPOINT,
-    serviceName: mergedEnv.OTEL_SERVICE_NAME ?? "journal-gateway",
+    serviceName: mergedEnv.OTEL_SERVICE_NAME ?? "journal-bastion",
     disabled: (mergedEnv.TELEMETRY_DISABLED ?? "").toLowerCase() === "true",
   });
 
@@ -119,7 +123,7 @@ async function main(): Promise<void> {
 
   const configFilePath = resolveConfigFilePath(mergedEnv, process.argv);
 
-  logger.info("Starting Journal Gateway", {
+  logger.info("Starting Journal Bastion", {
     url: config.url,
     mcpServers: config.mcpServers.map((s) => s.id),
     ...(config.skillsDir ? { skillsDir: config.skillsDir } : {}),
@@ -133,7 +137,7 @@ async function main(): Promise<void> {
   });
   await runtime.start();
 
-  const connection = new GatewayConnection(config, runtime, telemetry, audit);
+  const connection = new BastionConnection(config, runtime, telemetry, audit);
 
   // Register signal handlers before connect() so shutdown works during
   // startup retries (connect blocks until first auth success).
@@ -150,10 +154,10 @@ async function main(): Promise<void> {
 
   try {
     await connection.connect();
-    logger.info("Journal Gateway is running");
+    logger.info("Journal Bastion is running");
   } catch (err) {
     if (err instanceof AuthenticationError) {
-      logger.error("Service rejected the gateway token, exiting", {
+      logger.error("Service rejected the bastion token, exiting", {
         error: err.message,
       });
       await runtime.stop();

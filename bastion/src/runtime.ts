@@ -4,14 +4,14 @@ import {
   type Skill,
   type ToolResult,
   type IntegrationProvider,
-  type GatewayVersions,
-} from "journal-gateway-protocol";
+  type BastionVersions,
+} from "journal-bastion-protocol";
 import { EventEmitter } from "node:events";
 import { Logger } from "./common/logger.js";
 import {
   type RuntimeConfig,
   type McpServerConfig,
-  type GatewayConfigFile,
+  type BastionConfigFile,
   resolveConfigFile,
 } from "./config.js";
 import { McpClient } from "./mcp-client.js";
@@ -50,9 +50,9 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements IntegrationP
 
   private configWatcher: ConfigWatcher;
   private envFile: EnvFile;
-  private currentConfigFile: GatewayConfigFile;
+  private currentConfigFile: BastionConfigFile;
   private configReloadTimer: ReturnType<typeof setTimeout> | null = null;
-  private pendingConfigFile: GatewayConfigFile | undefined;
+  private pendingConfigFile: BastionConfigFile | undefined;
   private stopped = true;
 
   constructor(
@@ -120,7 +120,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements IntegrationP
     });
   }
 
-  getVersions(): GatewayVersions {
+  getVersions(): BastionVersions {
     return {
       mcpVersion: this.mcpVersion,
       skillsVersion: this.skillsVersion,
@@ -338,7 +338,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements IntegrationP
     }
   }
 
-  private scheduleConfigReload(configFile?: GatewayConfigFile): void {
+  private scheduleConfigReload(configFile?: BastionConfigFile): void {
     // Preserve the most recent config file across debounced calls.
     // An env_changed (no configFile) should not erase a pending config_changed.
     if (configFile) {
@@ -357,7 +357,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements IntegrationP
     }, 500);
   }
 
-  private async processChanges(newConfigFile?: GatewayConfigFile): Promise<void> {
+  private async processChanges(newConfigFile?: BastionConfigFile): Promise<void> {
     // Rebuild env: .env file values + process.env (process.env wins)
     const envVars = this.envFile.load();
     const newEnv: Record<string, string | undefined> = { ...envVars, ...process.env };
@@ -393,7 +393,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements IntegrationP
     // Warn if skillsDir changed
     if (configFile.skillsDir !== this.currentConfigFile.skillsDir) {
       this.logger.warn(
-        "skillsDir changes are not hot-reloaded. Restart the gateway to apply."
+        "skillsDir changes are not hot-reloaded. Restart the bastion to apply."
       );
     }
 

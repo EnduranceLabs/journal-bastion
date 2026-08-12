@@ -1,24 +1,24 @@
 {
-  "name": "journal-gateway",
-  "version": "0.8.1",
-  "description": "Outbound gateway for connecting MCP servers and skills to Journal",
+  "name": "journal-bastion",
+  "version": "0.9.0",
+  "description": "Outbound bastion for connecting MCP servers and skills to Journal",
   "license": "MIT",
   "type": "module",
   "keywords": [
     "journal",
-    "journal-gateway",
+    "journal-bastion",
     "mcp",
     "model-context-protocol",
-    "gateway"
+    "bastion"
   ],
-  "homepage": "https://github.com/EnduranceLabs/journal-gateway#readme",
+  "homepage": "https://github.com/EnduranceLabs/journal-bastion#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnduranceLabs/journal-gateway.git",
-    "directory": "gateway"
+    "url": "git+https://github.com/EnduranceLabs/journal-bastion.git",
+    "directory": "bastion"
   },
   "bugs": {
-    "url": "https://github.com/EnduranceLabs/journal-gateway/issues"
+    "url": "https://github.com/EnduranceLabs/journal-bastion/issues"
   },
   "main": "./dist/main.js",
   "types": "./dist/main.d.ts",
@@ -32,7 +32,7 @@
     }
   },
   "bin": {
-    "journal-gateway": "./dist/main.js"
+    "journal-bastion": "./dist/main.js"
   },
   "publishConfig": {
     "access": "public"
@@ -43,7 +43,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "journal-gateway-protocol": "workspace:*",
+    "journal-bastion-protocol": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.220.0",

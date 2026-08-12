@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GatewayConnection, AuthenticationError } from "../connection.js";
-import type { GatewayConfig, IntegrationProvider, GatewayVersions, Skill } from "journal-gateway-protocol";
+import { BastionConnection, AuthenticationError } from "../connection.js";
+import type { BastionConfig, IntegrationProvider, BastionVersions, Skill } from "journal-bastion-protocol";
 import { EventEmitter } from "node:events";
 
 // Mock ws
@@ -41,7 +41,7 @@ vi.mock("ws", () => {
 let mockWsInstances: MockWebSocket[] = [];
 let mockWsFactory: ((url: string) => MockWebSocket) | null = null;
 
-const config: GatewayConfig = {
+const config: BastionConfig = {
   token: "gw_test123",
   url: "wss://localhost/v1",
   logLevel: "error",
@@ -49,10 +49,10 @@ const config: GatewayConfig = {
 
 function createMockProvider(): IntegrationProvider & {
   _emitter: EventEmitter;
-  _versions: GatewayVersions;
+  _versions: BastionVersions;
 } {
   const emitter = new EventEmitter();
-  const versions: GatewayVersions = {
+  const versions: BastionVersions = {
     mcpVersion: "abcdef0123456789",
     skillsVersion: null,
   };
@@ -95,7 +95,7 @@ function authenticate(ws: MockWebSocket): void {
   }));
 }
 
-describe("GatewayConnection", () => {
+describe("BastionConnection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWsInstances = [];
@@ -104,7 +104,7 @@ describe("GatewayConnection", () => {
 
   it("completes full connection lifecycle", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -136,7 +136,7 @@ describe("GatewayConnection", () => {
 
   it("sends version_changed after auth with versions", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -156,7 +156,7 @@ describe("GatewayConnection", () => {
 
   it("sends version_changed on provider versions_changed event", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -184,7 +184,7 @@ describe("GatewayConnection", () => {
 
   it("responds to get_versions", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -214,7 +214,7 @@ describe("GatewayConnection", () => {
 
   it("responds to get_tools", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -247,7 +247,7 @@ describe("GatewayConnection", () => {
     const provider = createMockProvider();
     (provider.getTools as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
     const connectPromise = conn.connect();
 
     await new Promise((r) => setTimeout(r, 10));
@@ -276,7 +276,7 @@ describe("GatewayConnection", () => {
 
   it("responds to get_skills", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -306,7 +306,7 @@ describe("GatewayConnection", () => {
 
   it("cleans up change listener on close", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -325,7 +325,7 @@ describe("GatewayConnection", () => {
 
   it("rejects connect() and stops retrying on auth error before first success", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -355,7 +355,7 @@ describe("GatewayConnection", () => {
 
   it("keeps retrying on auth error after a successful session", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
     await new Promise((r) => setTimeout(r, 10));
@@ -385,7 +385,7 @@ describe("GatewayConnection", () => {
 
   it("responds to ping with pong", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -409,7 +409,7 @@ describe("GatewayConnection", () => {
 
   it("handles tool_call and sends tool_result", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -443,7 +443,7 @@ describe("GatewayConnection", () => {
 
   it("reconnects after unexpected close", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -466,7 +466,7 @@ describe("GatewayConnection", () => {
 
   it("does not reconnect after explicit close", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -486,7 +486,7 @@ describe("GatewayConnection", () => {
 
   it("close then connect does not produce two loops", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     // First connection
     const p1 = conn.connect();
@@ -513,7 +513,7 @@ describe("GatewayConnection", () => {
 
   it("close in-flight followed by immediate connect starts one new loop", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     // Establish first connection
     const p1 = conn.connect();
@@ -541,10 +541,10 @@ describe("GatewayConnection", () => {
   it("sends tool_error for unknown integration", async () => {
     const provider = createMockProvider();
     (provider.callTool as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new (await import("journal-gateway-protocol")).IntegrationNotFoundError("unknown")
+      new (await import("journal-bastion-protocol")).IntegrationNotFoundError("unknown")
     );
 
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
     const connectPromise = conn.connect();
 
     await new Promise((r) => setTimeout(r, 10));
@@ -571,7 +571,7 @@ describe("GatewayConnection", () => {
 
   it("ignores invalid messages gracefully", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -604,7 +604,7 @@ describe("GatewayConnection", () => {
       return ws;
     };
 
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -623,7 +623,7 @@ describe("GatewayConnection", () => {
 
   it("close() before first auth rejects connect()", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const connectPromise = conn.connect();
 
@@ -637,7 +637,7 @@ describe("GatewayConnection", () => {
 
   it("connect() is idempotent — second call returns same promise", async () => {
     const provider = createMockProvider();
-    const conn = new GatewayConnection(config, provider);
+    const conn = new BastionConnection(config, provider);
 
     const p1 = conn.connect();
     const p2 = conn.connect();

@@ -1,18 +1,18 @@
 import { z } from "zod";
 
-export const GATEWAY_ERROR_CODES = [
+export const BASTION_ERROR_CODES = [
   "INTEGRATION_NOT_FOUND",
   "EXECUTION_FAILED",
   "TIMEOUT",
 ] as const;
 
-export type GatewayErrorCode = (typeof GATEWAY_ERROR_CODES)[number];
+export type BastionErrorCode = (typeof BASTION_ERROR_CODES)[number];
 
-export const GatewayErrorCodeSchema = z.enum(GATEWAY_ERROR_CODES);
+export const BastionErrorCodeSchema = z.enum(BASTION_ERROR_CODES);
 
-export const GatewayErrorSchema = z.object({
-  code: GatewayErrorCodeSchema,
+export const BastionErrorSchema = z.object({
+  code: BastionErrorCodeSchema,
   message: z.string(),
 });
 
-export type GatewayError = z.infer<typeof GatewayErrorSchema>;
+export type BastionError = z.infer<typeof BastionErrorSchema>;

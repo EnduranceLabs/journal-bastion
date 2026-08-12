@@ -1,23 +1,23 @@
-# Journal Gateway Protocol
+# Journal Bastion Protocol
 
 Version: `2`
 
 ## Problem
 
-Organizations need their AI agents to access internal tools — databases, observability platforms, internal APIs — without exposing credentials or opening inbound network ports. The Journal Gateway Protocol solves this by letting a customer-deployed gateway connect **outbound** to the Journal Service over WebSocket. Credentials and data sources never leave the customer's network.
+Organizations need their AI agents to access internal tools — databases, observability platforms, internal APIs — without exposing credentials or opening inbound network ports. The Journal Bastion Protocol solves this by letting a customer-deployed bastion connect **outbound** to the Journal Service over WebSocket. Credentials and data sources never leave the customer's network.
 
 ## Transport
 
 - **Protocol:** WebSocket (`wss://`)
 - **Endpoint:** `wss://gateway.journal.one/v1`
-- **Direction:** Outbound from gateway to service (gateway initiates)
+- **Direction:** Outbound from bastion to service (bastion initiates)
 - **Encoding:** JSON (UTF-8)
 - **Framing:** Each WebSocket text frame contains exactly one JSON message
 
 ## Connection Lifecycle
 
 ```
-Gateway                                  Service
+Bastion                                  Service
   |                                         |
   |---- WebSocket Connect ----------------->|
   |                                         |
@@ -42,18 +42,18 @@ Gateway                                  Service
   |          +------------------+           |
 ```
 
-1. The gateway opens a WebSocket connection to the service endpoint.
+1. The bastion opens a WebSocket connection to the service endpoint.
 2. It sends an `authenticate` message with its token and version info.
-3. On success (`authenticated`), the gateway sends a `version_changed` message announcing its current version hashes. The connection is now ready — no registration handshake.
-4. The service may pull tools, skills, or versions at any time using `get_tools`, `get_skills`, or `get_versions`. The gateway responds with `tools`, `skills`, or `versions` respectively.
-5. The service sends `tool_call` requests and `ping` heartbeats; the gateway responds with `tool_result`/`tool_error` and `pong`.
-6. When the gateway detects that its tools or skills have changed at runtime, it sends another `version_changed` message. The service can then decide whether and what to pull.
+3. On success (`authenticated`), the bastion sends a `version_changed` message announcing its current version hashes. The connection is now ready — no registration handshake.
+4. The service may pull tools, skills, or versions at any time using `get_tools`, `get_skills`, or `get_versions`. The bastion responds with `tools`, `skills`, or `versions` respectively.
+5. The service sends `tool_call` requests and `ping` heartbeats; the bastion responds with `tool_result`/`tool_error` and `pong`.
+6. When the bastion detects that its tools or skills have changed at runtime, it sends another `version_changed` message. The service can then decide whether and what to pull.
 
 ## Message Reference
 
 All messages are JSON objects with a `type` field used as a discriminator.
 
-### Gateway -> Service
+### Bastion -> Service
 
 #### `authenticate`
 
@@ -62,9 +62,9 @@ Sent immediately after the WebSocket connection opens.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `type` | `"authenticate"` | yes | Message discriminator |
-| `token` | `string` | yes | Gateway auth token (`gw_*` prefix) |
+| `token` | `string` | yes | Bastion auth token (`gw_*` prefix) |
 | `protocolVersion` | `number` | yes | Protocol version (currently `2`) |
-| `gatewayVersion` | `string` | yes | Gateway software version (semver) |
+| `gatewayVersion` | `string` | yes | Bastion software version (semver) |
 
 ```json
 {
@@ -77,7 +77,7 @@ Sent immediately after the WebSocket connection opens.
 
 #### `version_changed`
 
-Sent after successful authentication and whenever the gateway detects that its tools or skills have changed at runtime. This is fire-and-forget — the service does not acknowledge it.
+Sent after successful authentication and whenever the bastion detects that its tools or skills have changed at runtime. This is fire-and-forget — the service does not acknowledge it.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -205,7 +205,7 @@ Sent in response to a `tool_call` when execution fails.
 |-------|------|----------|-------------|
 | `type` | `"tool_error"` | yes | Message discriminator |
 | `requestId` | `string` | yes | Correlates with the original `tool_call.requestId` |
-| `error` | `GatewayError` | yes | Error code and message |
+| `error` | `BastionError` | yes | Error code and message |
 
 ```json
 {
@@ -230,7 +230,7 @@ Sent in response to a `ping`.
 { "type": "pong" }
 ```
 
-### Service -> Gateway
+### Service -> Bastion
 
 #### `authenticated`
 
@@ -262,13 +262,13 @@ Sent when authentication fails.
 ```json
 {
   "type": "auth_error",
-  "error": "Invalid or expired gateway token"
+  "error": "Invalid or expired bastion token"
 }
 ```
 
 #### `get_versions`
 
-Request current version hashes from the gateway.
+Request current version hashes from the bastion.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -281,7 +281,7 @@ Request current version hashes from the gateway.
 
 #### `get_tools`
 
-Request MCP tool integrations from the gateway.
+Request MCP tool integrations from the bastion.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -294,7 +294,7 @@ Request MCP tool integrations from the gateway.
 
 #### `get_skills`
 
-Request skills from the gateway.
+Request skills from the bastion.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -316,7 +316,7 @@ Sent to invoke a tool on a known integration.
 | `integrationId` | `string` | yes | Target integration identifier |
 | `toolName` | `string` | yes | Tool name within the integration |
 | `arguments` | `object` | yes | Tool input arguments |
-| `traceparent` | `string` | no | W3C trace context; the gateway parents its tool-call span onto it |
+| `traceparent` | `string` | no | W3C trace context; the bastion parents its tool-call span onto it |
 | `tracestate` | `string` | no | W3C trace state, sent only alongside `traceparent` |
 
 ```json
@@ -351,9 +351,9 @@ The canonical definitions live in `protocol/src/` as Zod schemas. The tables bel
 
 ### Integration
 
-An integration groups a set of tools the agent can call. The gateway's `tools`
+An integration groups a set of tools the agent can call. The bastion's `tools`
 response carries MCP tool integrations. A client library may additionally
-synthesize a local `skills` integration in its public gateway state after handling
+synthesize a local `skills` integration in its public bastion state after handling
 the separate `skills` response; that integration is a client-side convenience and
 never appears on the wire.
 
@@ -401,18 +401,18 @@ Discriminated union on `type`.
 
 ### Skill
 
-A prompt/workflow template that guides agent behavior. Skills are raw Markdown content — the gateway does not parse or interpret them.
+A prompt/workflow template that guides agent behavior. Skills are raw Markdown content — the bastion does not parse or interpret them.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | yes | Unique identifier (derived from filename) |
 | `content` | `string` | yes | Raw Markdown content |
 
-### GatewayError
+### BastionError
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `code` | `GatewayErrorCode` | yes | Machine-readable error code |
+| `code` | `BastionErrorCode` | yes | Machine-readable error code |
 | `message` | `string` | yes | Human-readable error message |
 
 ## Timeouts
@@ -420,15 +420,15 @@ A prompt/workflow template that guides agent behavior. Skills are raw Markdown c
 | Timeout | Duration | Description |
 |---------|----------|-------------|
 | Authentication | 10s | Time to complete auth after WebSocket opens |
-| Pull response | 30s | Time for gateway to respond to a pull request |
+| Pull response | 30s | Time for bastion to respond to a pull request |
 | Heartbeat interval | 30s | Service sends `ping` every 30s |
-| Pong timeout | 10s | Gateway must respond to `ping` within 10s |
-| Tool call (gateway) | 60s | Gateway-side execution cap for a `tool_call` |
+| Pong timeout | 10s | Bastion must respond to `ping` within 10s |
+| Tool call (bastion) | 60s | Bastion-side execution cap for a `tool_call` |
 | Tool call (service/client) | client-defined | Client libraries let callers override this; TypeScript defaults to 90s, Python `call_tool_for_org` defaults to 90s, and Python `call_tool` defaults to 60s |
 
 ## Reconnection
 
-When the WebSocket connection drops, the gateway reconnects with exponential backoff:
+When the WebSocket connection drops, the bastion reconnects with exponential backoff:
 
 - **Initial delay:** 1 second
 - **Backoff multiplier:** 2x
@@ -438,7 +438,7 @@ When the WebSocket connection drops, the gateway reconnects with exponential bac
 
 ## Concurrency
 
-Multiple `tool_call` messages may be in flight simultaneously. Each carries a unique `requestId` that must be echoed in the corresponding `tool_result` or `tool_error` response. The gateway may process calls in any order.
+Multiple `tool_call` messages may be in flight simultaneously. Each carries a unique `requestId` that must be echoed in the corresponding `tool_result` or `tool_error` response. The bastion may process calls in any order.
 
 Similarly, multiple pull requests (`get_versions`, `get_tools`, `get_skills`) may be in flight simultaneously, each with a unique `requestId`.
 
@@ -446,7 +446,7 @@ Similarly, multiple pull requests (`get_versions`, `get_tools`, `get_skills`) ma
 
 | Code | Description |
 |------|-------------|
-| `INTEGRATION_NOT_FOUND` | The requested `integrationId` is not known to the gateway |
+| `INTEGRATION_NOT_FOUND` | The requested `integrationId` is not known to the bastion |
 | `TOOL_NOT_FOUND` | The requested `toolName` does not exist on the integration |
 | `EXECUTION_FAILED` | Tool execution threw an error |
 | `TIMEOUT` | Tool execution exceeded the timeout |
@@ -459,12 +459,12 @@ The `version_changed` message includes `mcpVersion` and `skillsVersion` fields. 
 - **`skillsVersion`** covers skills. Changes when skill files are added, removed, or edited.
 - Either field is `null` when the corresponding subsystem has no integrations.
 
-Version hashes are the **primary signal** for change detection. The service uses them to decide whether to pull updated tools or skills. Same content produces the same hash across restarts — there are no false positives from gateway restarts alone.
+Version hashes are the **primary signal** for change detection. The service uses them to decide whether to pull updated tools or skills. Same content produces the same hash across restarts — there are no false positives from bastion restarts alone.
 
 ## Security Invariants
 
-1. **Outbound-only connections.** The gateway initiates all connections. No inbound ports required.
-2. **Credentials stay local.** Database passwords, API tokens, and other secrets are configured on the gateway and never transmitted to Journal.
+1. **Outbound-only connections.** The bastion initiates all connections. No inbound ports required.
+2. **Credentials stay local.** Database passwords, API tokens, and other secrets are configured on the bastion and never transmitted to Journal.
 3. **Read-only default.** Integrations should default to read-only access where possible.
-4. **Token-based auth.** Gateway tokens (`gw_*`) are scoped to a single organization.
+4. **Token-based auth.** Bastion tokens (`gw_*`) are scoped to a single organization.
 5. **TLS required.** Production connections must use `wss://`.

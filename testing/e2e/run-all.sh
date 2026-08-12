@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# End-to-end test runner for Journal Gateway.
+# End-to-end test runner for Journal Bastion.
 #
-# Brings up Dockerized Postgres + MySQL, then drives the REAL gateway binary +
+# Brings up Dockerized Postgres + MySQL, then drives the REAL bastion binary +
 # REAL client library + REAL Google MCP Toolbox server against them, and asserts:
-#   - the gateway publishes MCP tools to the service (client) side
+#   - the bastion publishes MCP tools to the service (client) side
 #   - execute_sql read queries succeed and return rows
 #   - write queries are rejected by the dedicated read-only DB account
 #   - config hot-reload adds a server at runtime with no restart

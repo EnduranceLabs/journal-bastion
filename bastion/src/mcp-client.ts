@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServerConfig } from "./config.js";
-import { ContentBlockSchema, type ToolDefinition, type ToolResult, type ContentBlock } from "journal-gateway-protocol";
+import { ContentBlockSchema, type ToolDefinition, type ToolResult, type ContentBlock } from "journal-bastion-protocol";
 import { Logger } from "./common/logger.js";
 import { VERSION } from "./version.js";
 import { EventEmitter } from "node:events";
@@ -62,7 +62,7 @@ export class McpClient extends EventEmitter<McpClientEvents> {
     this.transport = this.createTransport();
 
     this.client = new Client(
-      { name: `journal-gateway/${this.definition.id}`, version: VERSION },
+      { name: `journal-bastion/${this.definition.id}`, version: VERSION },
       { capabilities: {} }
     );
 

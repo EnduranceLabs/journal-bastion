@@ -2,12 +2,12 @@ import WebSocket from "ws";
 import {
   ServiceMessageSchema,
   IntegrationNotFoundError,
-  type GatewayMessage,
+  type BastionMessage,
   type ServiceMessage,
-  type GatewayErrorCode,
+  type BastionErrorCode,
   type IntegrationProvider,
-  type GatewayConfig,
-} from "journal-gateway-protocol";
+  type BastionConfig,
+} from "journal-bastion-protocol";
 import { Logger } from "./common/logger.js";
 import { VERSION } from "./version.js";
 import { Telemetry } from "./telemetry.js";
@@ -25,7 +25,7 @@ class ToolTimeoutError extends Error {
   }
 }
 
-/** The service rejected the gateway's token on the initial connection. */
+/** The service rejected the bastion's token on the initial connection. */
 export class AuthenticationError extends Error {
   constructor(message: string) {
     super(message);
@@ -37,7 +37,7 @@ const RECONNECT_MAX_MS = 30_000;
 const RECONNECT_MULTIPLIER = 2;
 const RECONNECT_JITTER = 0.25;
 
-export class GatewayConnection {
+export class BastionConnection {
   private ws: WebSocket | null = null;
   private logger: Logger;
   private reconnectDelay = RECONNECT_INITIAL_MS;
@@ -54,7 +54,7 @@ export class GatewayConnection {
   private sleepResolve: (() => void) | null = null;
 
   constructor(
-    private config: GatewayConfig,
+    private config: BastionConfig,
     private provider: IntegrationProvider,
     telemetry?: Telemetry | null,
     audit?: AuditLogger | null
@@ -131,7 +131,7 @@ export class GatewayConnection {
       });
       this.audit?.log({
         type: "message",
-        direction: "gateway_to_service",
+        direction: "bastion_to_service",
         messageType: "connect",
       });
 
@@ -198,7 +198,7 @@ export class GatewayConnection {
               });
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "authenticated",
               });
 
@@ -223,7 +223,7 @@ export class GatewayConnection {
                 this.firstReadyReject = null;
               }
 
-              this.logger.info("Gateway ready");
+              this.logger.info("Bastion ready");
               break;
             }
 
@@ -234,7 +234,7 @@ export class GatewayConnection {
               });
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "auth_error",
               });
               // A rejected token before the first successful auth is a
@@ -253,7 +253,7 @@ export class GatewayConnection {
             case "get_versions": {
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "get_versions",
                 requestId: msg.requestId,
               });
@@ -270,7 +270,7 @@ export class GatewayConnection {
             case "get_tools": {
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "get_tools",
                 requestId: msg.requestId,
               });
@@ -288,7 +288,7 @@ export class GatewayConnection {
             case "get_skills": {
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "get_skills",
                 requestId: msg.requestId,
               });
@@ -306,7 +306,7 @@ export class GatewayConnection {
             case "tool_call": {
               this.audit?.log({
                 type: "message",
-                direction: "service_to_gateway",
+                direction: "service_to_bastion",
                 messageType: "tool_call",
                 requestId: msg.requestId,
                 integrationId: msg.integrationId,
@@ -453,7 +453,7 @@ export class GatewayConnection {
 
         return { kind: "success", durationMs };
       } catch (err) {
-        let code: GatewayErrorCode = "EXECUTION_FAILED";
+        let code: BastionErrorCode = "EXECUTION_FAILED";
         const message = err instanceof Error ? err.message : String(err);
 
         if (err instanceof IntegrationNotFoundError) {
@@ -527,12 +527,12 @@ export class GatewayConnection {
     }
   }
 
-  private send(message: GatewayMessage): void {
+  private send(message: BastionMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
       this.audit?.log({
         type: "message",
-        direction: "gateway_to_service",
+        direction: "bastion_to_service",
         messageType: message.type,
         requestId: "requestId" in message ? (message as { requestId?: string }).requestId : undefined,
         integrationId: "integrationId" in message ? (message as { integrationId?: string }).integrationId : undefined,
@@ -571,6 +571,6 @@ export class GatewayConnection {
       await this.loopPromise;
     }
 
-    this.logger.info("Gateway connection closed");
+    this.logger.info("Bastion connection closed");
   }
 }

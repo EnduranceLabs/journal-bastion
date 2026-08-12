@@ -1,15 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/EnduranceLabs/journal-gateway/main/spec/gateway-config.schema.json",
-  "title": "Journal Gateway config",
-  "description": "Configuration file for the Journal Gateway (journal-gateway).",
+  "$id": "https://raw.githubusercontent.com/EnduranceLabs/journal-bastion/main/spec/bastion-config.schema.json",
+  "title": "Journal Bastion config",
+  "description": "Configuration file for the Journal Bastion (journal-bastion).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
     "mcpServers": {
       "type": "array",
-      "description": "MCP server definitions the gateway exposes to Journal.",
+      "description": "MCP server definitions the bastion exposes to Journal.",
       "items": { "$ref": "#/definitions/mcpServer" }
     },
     "skillsDir": {

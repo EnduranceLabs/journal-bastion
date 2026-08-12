@@ -1,24 +1,24 @@
 {
-  "name": "journal-gateway-protocol",
-  "version": "0.8.1",
-  "description": "Shared TypeScript types and Zod schemas for the Journal Gateway protocol",
+  "name": "journal-bastion-protocol",
+  "version": "0.9.0",
+  "description": "Shared TypeScript types and Zod schemas for the Journal Bastion protocol",
   "license": "MIT",
   "type": "module",
   "keywords": [
     "journal",
-    "journal-gateway",
+    "journal-bastion",
     "protocol",
     "zod",
     "websocket"
   ],
-  "homepage": "https://github.com/EnduranceLabs/journal-gateway#readme",
+  "homepage": "https://github.com/EnduranceLabs/journal-bastion#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnduranceLabs/journal-gateway.git",
+    "url": "git+https://github.com/EnduranceLabs/journal-bastion.git",
     "directory": "protocol"
   },
   "bugs": {
-    "url": "https://github.com/EnduranceLabs/journal-gateway/issues"
+    "url": "https://github.com/EnduranceLabs/journal-bastion/issues"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

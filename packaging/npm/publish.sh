@@ -16,13 +16,13 @@ fi
 echo "Building all packages..."
 pnpm -r build
 
-echo "Publishing journal-gateway-protocol..."
+echo "Publishing journal-bastion-protocol..."
 (cd "$ROOT/protocol" && pnpm publish --access public --no-git-checks)
 
-echo "Publishing journal-gateway..."
-(cd "$ROOT/gateway" && pnpm publish --access public --no-git-checks)
+echo "Publishing journal-bastion..."
+(cd "$ROOT/bastion" && pnpm publish --access public --no-git-checks)
 
-echo "Publishing journal-gateway-client..."
+echo "Publishing journal-bastion-client..."
 (cd "$ROOT/clients/typescript" && pnpm publish --access public --no-git-checks)
 
 echo "Done. All packages published."

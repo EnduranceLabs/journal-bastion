@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  GatewayMessageSchema,
+  BastionMessageSchema,
   ServiceMessageSchema,
   AuthenticateMessageSchema,
   ToolResultMessageSchema,
@@ -17,9 +17,9 @@ import {
   GetVersionsMessageSchema,
   GetToolsMessageSchema,
   GetSkillsMessageSchema,
-} from "journal-gateway-protocol";
+} from "journal-bastion-protocol";
 
-describe("Gateway -> Service messages", () => {
+describe("Bastion -> Service messages", () => {
   it("parses authenticate message", () => {
     const msg = {
       type: "authenticate",
@@ -165,7 +165,7 @@ describe("Gateway -> Service messages", () => {
     expect(PongMessageSchema.parse(msg)).toEqual(msg);
   });
 
-  it("parses all gateway message types via discriminated union", () => {
+  it("parses all bastion message types via discriminated union", () => {
     const messages = [
       {
         type: "authenticate",
@@ -191,7 +191,7 @@ describe("Gateway -> Service messages", () => {
     ];
 
     for (const msg of messages) {
-      expect(() => GatewayMessageSchema.parse(msg)).not.toThrow();
+      expect(() => BastionMessageSchema.parse(msg)).not.toThrow();
     }
   });
 
@@ -214,7 +214,7 @@ describe("Gateway -> Service messages", () => {
   });
 });
 
-describe("Service -> Gateway messages", () => {
+describe("Service -> Bastion messages", () => {
   it("parses authenticated message", () => {
     const msg = {
       type: "authenticated",
@@ -298,8 +298,8 @@ describe("Service -> Gateway messages", () => {
     expect(() => ServiceMessageSchema.parse(msg)).toThrow();
   });
 
-  it("rejects unknown message type in gateway union", () => {
+  it("rejects unknown message type in bastion union", () => {
     const msg = { type: "not_a_real_type" };
-    expect(() => GatewayMessageSchema.parse(msg)).toThrow();
+    expect(() => BastionMessageSchema.parse(msg)).toThrow();
   });
 });

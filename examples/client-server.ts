@@ -1,30 +1,30 @@
-// Minimal Journal Gateway client server (TypeScript).
+// Minimal Journal Bastion client server (TypeScript).
 //
-//   npm install journal-gateway-client
+//   npm install journal-bastion-client
 //   npx tsx client-server.ts
 //
-// Then point a gateway at ws://localhost:8080 with token "gw_demo":
-//   JOURNAL_GATEWAY_TOKEN=gw_demo \
-//   JOURNAL_GATEWAY_URL=ws://localhost:8080 \
-//   journal-gateway --config gateway.json
+// Then point a bastion at ws://localhost:8080 with token "gw_demo":
+//   JOURNAL_BASTION_TOKEN=gw_demo \
+//   JOURNAL_BASTION_URL=ws://localhost:8080 \
+//   journal-bastion --config bastion.json
 
-import { GatewayServer } from "journal-gateway-client";
+import { BastionServer } from "journal-bastion-client";
 
-const server = new GatewayServer({
+const server = new BastionServer({
   port: 8080,
   validateToken: async (token) =>
     token === "gw_demo" ? { organizationId: "org_demo" } : null,
 });
 
-server.onGatewayConnected = (gateway) => {
-  console.log(`gateway ${gateway.id} connected`);
-  for (const integration of gateway.integrations) {
+server.onBastionConnected = (bastion) => {
+  console.log(`bastion ${bastion.id} connected`);
+  for (const integration of bastion.integrations) {
     console.log(`  ${integration.id}: ${integration.tools.length} tools`);
   }
 };
 
-server.onGatewayDisconnected = (gateway) => {
-  console.log(`gateway ${gateway.id} disconnected`);
+server.onBastionDisconnected = (bastion) => {
+  console.log(`bastion ${bastion.id} disconnected`);
 };
 
 await server.start();

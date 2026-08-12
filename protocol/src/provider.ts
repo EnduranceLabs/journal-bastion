@@ -1,7 +1,7 @@
 import type { Integration, ToolResult } from "./integrations.js";
 import type { Skill } from "./skills.js";
 
-export interface GatewayVersions {
+export interface BastionVersions {
   mcpVersion: string | null;
   skillsVersion: string | null;
 }
@@ -9,7 +9,7 @@ export interface GatewayVersions {
 export interface IntegrationProvider {
   getTools(): Integration[];
   getSkills(): Skill[];
-  getVersions(): GatewayVersions;
+  getVersions(): BastionVersions;
   callTool(integrationId: string, toolName: string, args: Record<string, unknown>): Promise<ToolResult>;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -19,12 +19,12 @@ export interface IntegrationProvider {
 
 export class IntegrationNotFoundError extends Error {
   constructor(integrationId: string, detail?: string) {
-    super(detail ?? `Integration "${integrationId}" is not known to the gateway`);
+    super(detail ?? `Integration "${integrationId}" is not known to the bastion`);
     this.name = "IntegrationNotFoundError";
   }
 }
 
-export interface GatewayConfig {
+export interface BastionConfig {
   token: string;
   url: string;
   logLevel: "debug" | "info" | "warn" | "error";

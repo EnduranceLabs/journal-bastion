@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { readFileSync } from "node:fs";
-import type { GatewayConfig } from "journal-gateway-protocol";
+import type { BastionConfig } from "journal-bastion-protocol";
 
 // --- Discriminated union for MCP server configs ---
 
@@ -52,7 +52,7 @@ export type McpServerConfig =
   | SseServerConfig
   | StreamableHttpServerConfig;
 
-export type RuntimeConfig = GatewayConfig & {
+export type RuntimeConfig = BastionConfig & {
   mcpServers: McpServerConfig[];
   mcpEnvVars: Map<string, Record<string, string>>;
   skillsDir: string | null;
@@ -62,7 +62,7 @@ export type RuntimeConfig = GatewayConfig & {
 const WS_SCHEMES = new Set(["ws:", "wss:", "http:", "https:"]);
 
 const OperationalSchema = z.object({
-  token: z.string().min(1, "JOURNAL_GATEWAY_TOKEN is required"),
+  token: z.string().min(1, "JOURNAL_BASTION_TOKEN is required"),
   url: z
     .string()
     .url()
@@ -99,7 +99,7 @@ function preprocessMcpServers(
   });
 }
 
-export const GatewayConfigFileSchema = z.object({
+export const BastionConfigFileSchema = z.object({
   mcpServers: z
     .array(z.unknown())
     .default([])
@@ -108,7 +108,7 @@ export const GatewayConfigFileSchema = z.object({
   skillsDir: z.string().nullable().default(null),
 });
 
-export type GatewayConfigFile = z.infer<typeof GatewayConfigFileSchema>;
+export type BastionConfigFile = z.infer<typeof BastionConfigFileSchema>;
 
 function parseCliConfigArg(argv: string[]): string | null {
   const idx = argv.indexOf("--config");
@@ -119,7 +119,7 @@ function parseCliConfigArg(argv: string[]): string | null {
 /**
  * Read and parse a config file from disk. Throws on read or JSON parse errors.
  */
-export function readConfigFile(path: string): GatewayConfigFile {
+export function readConfigFile(path: string): BastionConfigFile {
   let raw: string;
   try {
     raw = readFileSync(path, "utf-8");
@@ -132,15 +132,15 @@ export function readConfigFile(path: string): GatewayConfigFile {
   } catch {
     throw new Error(`Config file is not valid JSON: ${path}`);
   }
-  return GatewayConfigFileSchema.parse(parsed);
+  return BastionConfigFileSchema.parse(parsed);
 }
 
 /**
- * Resolve a GatewayConfigFile against environment variables.
+ * Resolve a BastionConfigFile against environment variables.
  * Returns McpServerConfig[] with name defaults applied, and a Map of resolved env vars per server.
  */
 export function resolveConfigFile(
-  configFile: GatewayConfigFile,
+  configFile: BastionConfigFile,
   env: Record<string, string | undefined>
 ): { mcpServers: McpServerConfig[]; mcpEnvVars: Map<string, Record<string, string>> } {
   const mcpServers: McpServerConfig[] = [];
@@ -184,6 +184,18 @@ export function resolveConfigFile(
 }
 
 /**
+ * Read a JOURNAL_BASTION_* variable, falling back to the pre-rename
+ * JOURNAL_GATEWAY_* name. Kept so an environment provisioned before the
+ * gateway->bastion rename keeps working untouched; remove in the next major.
+ */
+export function readBastionEnv(
+  env: Record<string, string | undefined>,
+  suffix: "TOKEN" | "URL" | "CONFIG" | "ENV_FILE"
+): string | undefined {
+  return env[`JOURNAL_BASTION_${suffix}`] ?? env[`JOURNAL_GATEWAY_${suffix}`];
+}
+
+/**
  * Resolve the config file path from CLI args and env vars.
  * Returns null for inline JSON or when no config is specified.
  */
@@ -194,7 +206,7 @@ export function resolveConfigFilePath(
   const cliConfigPath = parseCliConfigArg(argv);
   if (cliConfigPath) return cliConfigPath;
 
-  const envConfig = env.JOURNAL_GATEWAY_CONFIG ?? null;
+  const envConfig = readBastionEnv(env, "CONFIG") ?? null;
   if (envConfig && !envConfig.trimStart().startsWith("{")) {
     return envConfig;
   }
@@ -206,8 +218,8 @@ export function parseConfig(
   env: Record<string, string | undefined> = process.env,
   argv: string[] = process.argv
 ): RuntimeConfig {
-  const token = env.JOURNAL_GATEWAY_TOKEN ?? "";
-  const url = env.JOURNAL_GATEWAY_URL ?? "wss://gateway.journal.one/v1";
+  const token = readBastionEnv(env, "TOKEN") ?? "";
+  const url = readBastionEnv(env, "URL") ?? "wss://gateway.journal.one/v1";
   const logLevel = (env.LOG_LEVEL ?? "info") as
     | "debug"
     | "info"
@@ -216,11 +228,11 @@ export function parseConfig(
 
   const base = OperationalSchema.parse({ token, url, logLevel });
 
-  // Resolve config: --config arg > JOURNAL_GATEWAY_CONFIG env var > empty config
+  // Resolve config: --config arg > JOURNAL_BASTION_CONFIG env var > empty config
   const cliConfigPath = parseCliConfigArg(argv);
-  const envConfig = env.JOURNAL_GATEWAY_CONFIG ?? null;
+  const envConfig = readBastionEnv(env, "CONFIG") ?? null;
 
-  let configFile: GatewayConfigFile;
+  let configFile: BastionConfigFile;
 
   if (cliConfigPath) {
     configFile = readConfigFile(cliConfigPath);
@@ -231,20 +243,20 @@ export function parseConfig(
       try {
         parsed = JSON.parse(envConfig);
       } catch {
-        throw new Error("JOURNAL_GATEWAY_CONFIG is not valid JSON");
+        throw new Error("JOURNAL_BASTION_CONFIG is not valid JSON");
       }
-      configFile = GatewayConfigFileSchema.parse(parsed);
+      configFile = BastionConfigFileSchema.parse(parsed);
     } else {
       configFile = readConfigFile(envConfig);
     }
   } else {
-    configFile = GatewayConfigFileSchema.parse({});
+    configFile = BastionConfigFileSchema.parse({});
   }
 
   const warnings =
     configFile.mcpServers.length === 0 && !configFile.skillsDir
       ? [
-          "No mcpServers or skillsDir configured; the gateway will connect without tools or skills.",
+          "No mcpServers or skillsDir configured; the bastion will connect without tools or skills.",
         ]
       : [];
 

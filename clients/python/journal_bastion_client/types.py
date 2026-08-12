@@ -49,17 +49,17 @@ class ToolResult:
 
 
 @dataclass
-class GatewayError:
+class BastionError:
     code: str
     message: str
 
 
 @dataclass
-class ConnectedGateway:
+class ConnectedBastion:
     id: str
     organization_id: str
     protocol_version: int
-    gateway_version: str
+    bastion_version: str
     integrations: list[Integration]
     mcp_version: str | None = None
     skills_version: str | None = None

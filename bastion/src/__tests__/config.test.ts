@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { parseConfig, GatewayConfigFileSchema } from "../config.js";
+import { parseConfig, BastionConfigFileSchema } from "../config.js";
 
 vi.mock("node:fs", () => ({
   readFileSync: vi.fn(),
@@ -11,7 +11,7 @@ const mockReadFileSync = vi.mocked(readFileSync);
 
 function baseEnv(overrides: Record<string, string> = {}): Record<string, string> {
   return {
-    JOURNAL_GATEWAY_TOKEN: "gw_test123",
+    JOURNAL_BASTION_TOKEN: "gw_test123",
     ...overrides,
   };
 }
@@ -23,26 +23,61 @@ beforeEach(() => {
 describe("parseConfig", () => {
   // --- Operational env vars ---
 
-  it("requires JOURNAL_GATEWAY_TOKEN", () => {
+  it("requires JOURNAL_BASTION_TOKEN", () => {
     expect(() => parseConfig({}, [])).toThrow();
   });
 
+  // --- Pre-rename env var names (gateway -> bastion compatibility) ---
+
+  it("falls back to JOURNAL_GATEWAY_TOKEN when the bastion name is unset", () => {
+    const config = parseConfig(
+      { JOURNAL_GATEWAY_TOKEN: "gw_legacy", JOURNAL_BASTION_CONFIG: "{}" },
+      []
+    );
+    expect(config.token).toBe("gw_legacy");
+  });
+
+  it("prefers the bastion env var over the legacy gateway one", () => {
+    const config = parseConfig(
+      {
+        JOURNAL_BASTION_TOKEN: "gw_new",
+        JOURNAL_GATEWAY_TOKEN: "gw_legacy",
+        JOURNAL_BASTION_CONFIG: "{}",
+      },
+      []
+    );
+    expect(config.token).toBe("gw_new");
+  });
+
+  it("falls back to JOURNAL_GATEWAY_URL and JOURNAL_GATEWAY_CONFIG", () => {
+    const config = parseConfig(
+      {
+        JOURNAL_GATEWAY_TOKEN: "gw_legacy",
+        JOURNAL_GATEWAY_URL: "ws://legacy.example:3000",
+        JOURNAL_GATEWAY_CONFIG: "{}",
+      },
+      []
+    );
+    expect(config.url).toBe("ws://legacy.example:3000");
+    expect(config.mcpServers).toEqual([]);
+  });
+
   it("uses default URL when not specified", () => {
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: "{}" }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
     expect(config.url).toBe("wss://gateway.journal.one/v1");
   });
 
   it("uses default log level when not specified", () => {
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: "{}" }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
     expect(config.logLevel).toBe("info");
   });
 
   it("respects custom URL and log level", () => {
     const config = parseConfig(
       baseEnv({
-        JOURNAL_GATEWAY_URL: "wss://custom.example.com/v1",
+        JOURNAL_BASTION_URL: "wss://custom.example.com/v1",
         LOG_LEVEL: "debug",
-        JOURNAL_GATEWAY_CONFIG: "{}",
+        JOURNAL_BASTION_CONFIG: "{}",
       }),
       []
     );
@@ -54,8 +89,8 @@ describe("parseConfig", () => {
     expect(() =>
       parseConfig(
         baseEnv({
-          JOURNAL_GATEWAY_URL: "ftp://example.com",
-          JOURNAL_GATEWAY_CONFIG: "{}",
+          JOURNAL_BASTION_URL: "ftp://example.com",
+          JOURNAL_BASTION_CONFIG: "{}",
         }),
         []
       )
@@ -78,35 +113,35 @@ describe("parseConfig", () => {
     expect(config.skillsDir).toBe("/opt/skills");
   });
 
-  it("loads config from JOURNAL_GATEWAY_CONFIG file path", () => {
+  it("loads config from JOURNAL_BASTION_CONFIG file path", () => {
     const configJson = JSON.stringify({ skillsDir: "/opt/skills" });
     mockReadFileSync.mockReturnValue(configJson);
 
     const config = parseConfig(
-      baseEnv({ JOURNAL_GATEWAY_CONFIG: "/etc/gateway.json" }),
+      baseEnv({ JOURNAL_BASTION_CONFIG: "/etc/bastion.json" }),
       []
     );
-    expect(mockReadFileSync).toHaveBeenCalledWith("/etc/gateway.json", "utf-8");
+    expect(mockReadFileSync).toHaveBeenCalledWith("/etc/bastion.json", "utf-8");
     expect(config.skillsDir).toBe("/opt/skills");
   });
 
-  it("parses inline JSON from JOURNAL_GATEWAY_CONFIG", () => {
+  it("parses inline JSON from JOURNAL_BASTION_CONFIG", () => {
     const inline = JSON.stringify({
       mcpServers: [{ id: "test", command: "echo" }],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     expect(config.mcpServers).toHaveLength(1);
     expect(config.mcpServers[0].id).toBe("test");
     // readFileSync should NOT be called for inline JSON
     expect(mockReadFileSync).not.toHaveBeenCalled();
   });
 
-  it("--config takes precedence over JOURNAL_GATEWAY_CONFIG env var", () => {
+  it("--config takes precedence over JOURNAL_BASTION_CONFIG env var", () => {
     const fileConfig = JSON.stringify({ skillsDir: "/from-file" });
     mockReadFileSync.mockReturnValue(fileConfig);
 
     const config = parseConfig(
-      baseEnv({ JOURNAL_GATEWAY_CONFIG: '{"skillsDir": "/from-env"}' }),
+      baseEnv({ JOURNAL_BASTION_CONFIG: '{"skillsDir": "/from-env"}' }),
       ["node", "main.js", "--config", "/tmp/gw.json"]
     );
     expect(config.skillsDir).toBe("/from-file");
@@ -119,7 +154,7 @@ describe("parseConfig", () => {
       mcpServers: [{ command: "echo" }],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow();
   });
 
@@ -128,7 +163,7 @@ describe("parseConfig", () => {
       mcpServers: [{ id: "test", transport: "stdio" }],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow();
   });
 
@@ -136,7 +171,7 @@ describe("parseConfig", () => {
     const inline = JSON.stringify({
       mcpServers: [{ id: "minimal", command: "echo" }],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     const server = config.mcpServers[0];
     expect(server.name).toBe("minimal"); // defaults to id
     expect(server.description).toBe("");
@@ -148,7 +183,7 @@ describe("parseConfig", () => {
   });
 
   it("accepts empty {} as valid config", () => {
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: "{}" }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
     expect(config.mcpServers).toEqual([]);
     expect(config.skillsDir).toBeNull();
   });
@@ -163,7 +198,7 @@ describe("parseConfig", () => {
     });
     const config = parseConfig(
       baseEnv({
-        JOURNAL_GATEWAY_CONFIG: inline,
+        JOURNAL_BASTION_CONFIG: inline,
         DATABASE_URL: "postgresql://localhost:5432/test",
       }),
       []
@@ -179,7 +214,7 @@ describe("parseConfig", () => {
       ],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow('MCP server "db" requires environment variable DATABASE_URL');
   });
 
@@ -201,22 +236,22 @@ describe("parseConfig", () => {
     ).toThrow("Config file is not valid JSON: /bad.json");
   });
 
-  it("throws when JOURNAL_GATEWAY_CONFIG env is invalid JSON", () => {
+  it("throws when JOURNAL_BASTION_CONFIG env is invalid JSON", () => {
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: "{bad json" }), [])
-    ).toThrow("JOURNAL_GATEWAY_CONFIG is not valid JSON");
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{bad json" }), [])
+    ).toThrow("JOURNAL_BASTION_CONFIG is not valid JSON");
   });
 
   it("records a warning when no servers or skills are configured", () => {
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: "{}" }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
     expect(config.warnings).toEqual([
-      "No mcpServers or skillsDir configured; the gateway will connect without tools or skills.",
+      "No mcpServers or skillsDir configured; the bastion will connect without tools or skills.",
     ]);
   });
 
   it("records no warnings when servers or skills are configured", () => {
     const inline = JSON.stringify({ skillsDir: "/opt/skills" });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     expect(config.warnings).toEqual([]);
   });
 
@@ -226,7 +261,7 @@ describe("parseConfig", () => {
     const inline = JSON.stringify({
       mcpServers: [{ id: "legacy", command: "npx", args: ["server"] }],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     expect(config.mcpServers[0].transport).toBe("stdio");
   });
 
@@ -236,7 +271,7 @@ describe("parseConfig", () => {
         { id: "remote", transport: "sse", url: "https://mcp.example.com/sse" },
       ],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     expect(config.mcpServers[0].transport).toBe("sse");
   });
 
@@ -248,7 +283,7 @@ describe("parseConfig", () => {
         { id: "remote", transport: "sse", url: "https://mcp.example.com/sse" },
       ],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     const server = config.mcpServers[0];
     expect(server.transport).toBe("sse");
     if (server.transport === "sse") {
@@ -261,7 +296,7 @@ describe("parseConfig", () => {
       mcpServers: [{ id: "bad", transport: "sse" }],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow();
   });
 
@@ -278,7 +313,7 @@ describe("parseConfig", () => {
     });
     const config = parseConfig(
       baseEnv({
-        JOURNAL_GATEWAY_CONFIG: inline,
+        JOURNAL_BASTION_CONFIG: inline,
         API_KEY: "Bearer sk-123",
       }),
       []
@@ -299,7 +334,7 @@ describe("parseConfig", () => {
       ],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow(
       'MCP server "remote" requires environment variable MISSING_KEY for header "Authorization"'
     );
@@ -313,7 +348,7 @@ describe("parseConfig", () => {
         { id: "api", transport: "streamable-http", url: "https://mcp.example.com/mcp" },
       ],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     const server = config.mcpServers[0];
     expect(server.transport).toBe("streamable-http");
     if (server.transport === "streamable-http") {
@@ -326,7 +361,7 @@ describe("parseConfig", () => {
       mcpServers: [{ id: "bad", transport: "streamable-http" }],
     });
     expect(() =>
-      parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), [])
+      parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), [])
     ).toThrow();
   });
 
@@ -343,7 +378,7 @@ describe("parseConfig", () => {
     });
     const config = parseConfig(
       baseEnv({
-        JOURNAL_GATEWAY_CONFIG: inline,
+        JOURNAL_BASTION_CONFIG: inline,
         SECRET_KEY: "my-secret",
       }),
       []
@@ -362,7 +397,7 @@ describe("parseConfig", () => {
         { id: "remote-http", transport: "streamable-http", url: "https://mcp.example.com/mcp" },
       ],
     });
-    const config = parseConfig(baseEnv({ JOURNAL_GATEWAY_CONFIG: inline }), []);
+    const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: inline }), []);
     expect(config.mcpServers).toHaveLength(3);
     expect(config.mcpServers[0].transport).toBe("stdio");
     expect(config.mcpServers[1].transport).toBe("sse");
@@ -370,9 +405,9 @@ describe("parseConfig", () => {
   });
 });
 
-describe("GatewayConfigFileSchema", () => {
+describe("BastionConfigFileSchema", () => {
   it("validates a full config", () => {
-    const result = GatewayConfigFileSchema.parse({
+    const result = BastionConfigFileSchema.parse({
       mcpServers: [
         {
           id: "pg",
@@ -390,7 +425,7 @@ describe("GatewayConfigFileSchema", () => {
   });
 
   it("applies defaults for empty object", () => {
-    const result = GatewayConfigFileSchema.parse({});
+    const result = BastionConfigFileSchema.parse({});
     expect(result.mcpServers).toEqual([]);
     expect(result.skillsDir).toBeNull();
   });

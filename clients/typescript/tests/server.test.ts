@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createServer, type Server as HttpServer } from "node:http";
-import { GatewayServer, type ConnectedGateway } from "../src/server.js";
+import { BastionServer, type ConnectedBastion } from "../src/server.js";
 import WebSocket, { WebSocketServer } from "ws";
 
 function connectAndAuth(
@@ -100,11 +100,11 @@ const TEST_INTEGRATION = {
   ],
 };
 
-describe("GatewayServer", () => {
-  let server: GatewayServer;
+describe("BastionServer", () => {
+  let server: BastionServer;
 
   beforeEach(async () => {
-    server = new GatewayServer({
+    server = new BastionServer({
       port: 0,
       validateToken: async (token) =>
         token === "gw_valid"
@@ -122,9 +122,9 @@ describe("GatewayServer", () => {
   it("accepts valid token and connects after version_changed", async () => {
     const ws = await connectAndAuth(server.url, "gw_valid");
     await sendVersionChanged(ws, []);
-    expect(server.connectedGateways).toHaveLength(1);
-    expect(server.connectedGateways[0].protocolVersion).toBe(2);
-    expect(server.connectedGateways[0].gatewayVersion).toBe("0.1.0-test");
+    expect(server.connectedBastions).toHaveLength(1);
+    expect(server.connectedBastions[0].protocolVersion).toBe(2);
+    expect(server.connectedBastions[0].gatewayVersion).toBe("0.1.0-test");
     ws.close();
   });
 
@@ -137,14 +137,14 @@ describe("GatewayServer", () => {
   it("surfaces async connection handler failures via onSocketError", async () => {
     await server.stop();
 
-    const errors: Array<{ error: Error; gateway: ConnectedGateway | null }> = [];
-    server = new GatewayServer({
+    const errors: Array<{ error: Error; bastion: ConnectedBastion | null }> = [];
+    server = new BastionServer({
       port: 0,
       validateToken: async () => {
         throw new Error("token validator unavailable");
       },
       pingIntervalMs: 0,
-      onSocketError: (error, gateway) => errors.push({ error, gateway }),
+      onSocketError: (error, bastion) => errors.push({ error, bastion }),
     });
     await server.start();
 
@@ -164,7 +164,7 @@ describe("GatewayServer", () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0].error.message).toBe("token validator unavailable");
-    expect(errors[0].gateway).toBeNull();
+    expect(errors[0].bastion).toBeNull();
   });
 
   it("callTool returns result", async () => {
@@ -229,15 +229,15 @@ describe("GatewayServer", () => {
     ws.close();
   });
 
-  it("callTool throws when no gateway has integration", async () => {
+  it("callTool throws when no bastion has integration", async () => {
     await expect(
       server.callTool("nonexistent", "tool", {})
-    ).rejects.toThrow('No gateway has integration "nonexistent"');
+    ).rejects.toThrow('No bastion has integration "nonexistent"');
   });
 
   it("sends pings and receives pongs", async () => {
     await server.stop();
-    server = new GatewayServer({
+    server = new BastionServer({
       port: 0,
       validateToken: async (token) =>
         token === "gw_valid" ? { organizationId: "org_1" } : null,
@@ -262,21 +262,21 @@ describe("GatewayServer", () => {
     ws.close();
   });
 
-  it("fires onGatewayDisconnected when gateway closes", async () => {
-    let disconnected: ConnectedGateway | null = null;
-    server.onGatewayDisconnected = (gw) => {
+  it("fires onBastionDisconnected when bastion closes", async () => {
+    let disconnected: ConnectedBastion | null = null;
+    server.onBastionDisconnected = (gw) => {
       disconnected = gw;
     };
 
     const ws = await connectAndAuth(server.url, "gw_valid");
     await sendVersionChanged(ws, []);
-    expect(server.connectedGateways).toHaveLength(1);
+    expect(server.connectedBastions).toHaveLength(1);
 
     ws.close();
     await new Promise((r) => setTimeout(r, 100));
     expect(disconnected).not.toBeNull();
     expect(disconnected!.id).toBeTruthy();
-    expect(server.connectedGateways).toHaveLength(0);
+    expect(server.connectedBastions).toHaveLength(0);
   });
 
   it("handles concurrent tool calls correctly", async () => {
@@ -314,9 +314,9 @@ describe("GatewayServer", () => {
     ws.close();
   });
 
-  it("version_changed triggers auto-pull and fires onGatewayConnected", async () => {
-    let connected: ConnectedGateway | null = null;
-    server.onGatewayConnected = (gw) => {
+  it("version_changed triggers auto-pull and fires onBastionConnected", async () => {
+    let connected: ConnectedBastion | null = null;
+    server.onBastionConnected = (gw) => {
       connected = gw;
     };
 
@@ -330,9 +330,9 @@ describe("GatewayServer", () => {
     ws.close();
   });
 
-  it("subsequent version_changed fires onGatewayUpdated with pulled data", async () => {
-    let updatedGateway: ConnectedGateway | null = null;
-    server.onGatewayUpdated = (gw) => { updatedGateway = gw; };
+  it("subsequent version_changed fires onBastionUpdated with pulled data", async () => {
+    let updatedBastion: ConnectedBastion | null = null;
+    server.onBastionUpdated = (gw) => { updatedBastion = gw; };
 
     const ws = await connectAndAuth(server.url, "gw_valid");
     await sendVersionChanged(ws, [TEST_INTEGRATION], { mcpVersion: "v1" });
@@ -368,9 +368,9 @@ describe("GatewayServer", () => {
 
     await new Promise((r) => setTimeout(r, 200));
 
-    expect(updatedGateway).not.toBeNull();
-    expect(server.connectedGateways[0].integrations[0].tools).toHaveLength(3);
-    expect(server.connectedGateways[0].mcpVersion).toBe("v2");
+    expect(updatedBastion).not.toBeNull();
+    expect(server.connectedBastions[0].integrations[0].tools).toHaveLength(3);
+    expect(server.connectedBastions[0].mcpVersion).toBe("v2");
 
     ws.removeListener("message", pullHandler);
     ws.close();
@@ -395,15 +395,15 @@ describe("GatewayServer", () => {
     ws.close();
   });
 
-  it("connected gateway has null version fields when no tools/skills", async () => {
+  it("connected bastion has null version fields when no tools/skills", async () => {
     const ws = await connectAndAuth(server.url, "gw_valid");
     await sendVersionChanged(ws, []);
-    expect(server.connectedGateways[0].mcpVersion).toBeNull();
-    expect(server.connectedGateways[0].skillsVersion).toBeNull();
+    expect(server.connectedBastions[0].mcpVersion).toBeNull();
+    expect(server.connectedBastions[0].skillsVersion).toBeNull();
     ws.close();
   });
 
-  it("connected gateway stores version fields from version_changed", async () => {
+  it("connected bastion stores version fields from version_changed", async () => {
     const ws = await connectAndAuth(server.url, "gw_valid");
     await sendVersionChanged(ws, [TEST_INTEGRATION], {
       mcpVersion: "abc123",
@@ -411,14 +411,14 @@ describe("GatewayServer", () => {
       skills: [{ id: "review", content: "Review PR..." }],
     });
 
-    expect(server.connectedGateways[0].mcpVersion).toBe("abc123");
-    expect(server.connectedGateways[0].skillsVersion).toBe("def456");
+    expect(server.connectedBastions[0].mcpVersion).toBe("abc123");
+    expect(server.connectedBastions[0].skillsVersion).toBe("def456");
     ws.close();
   });
 });
 
-describe("GatewayServer (external server mode)", () => {
-  let gateway: GatewayServer;
+describe("BastionServer (external server mode)", () => {
+  let bastion: BastionServer;
   let httpServer: HttpServer;
   let wss: WebSocketServer;
   let port: number;
@@ -426,7 +426,7 @@ describe("GatewayServer (external server mode)", () => {
 
   beforeEach(async () => {
     serverSockets = [];
-    gateway = new GatewayServer({
+    bastion = new BastionServer({
       validateToken: async (token) =>
         token === "gw_valid"
           ? { organizationId: "org_1", organizationName: "Test Org" }
@@ -434,7 +434,7 @@ describe("GatewayServer (external server mode)", () => {
       pingIntervalMs: 0,
     });
 
-    // Create an external HTTP + WS server and pipe connections to GatewayServer
+    // Create an external HTTP + WS server and pipe connections to BastionServer
     httpServer = createServer();
     wss = new WebSocketServer({ noServer: true });
 
@@ -442,7 +442,7 @@ describe("GatewayServer (external server mode)", () => {
       if (req.url === "/ws") {
         wss.handleUpgrade(req, socket, head, (ws) => {
           serverSockets.push(ws);
-          gateway.handleConnection(ws);
+          bastion.handleConnection(ws);
         });
       } else {
         socket.destroy();
@@ -459,7 +459,7 @@ describe("GatewayServer (external server mode)", () => {
   });
 
   afterEach(async () => {
-    gateway.shutdown();
+    bastion.shutdown();
     wss.close();
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
   });
@@ -468,8 +468,8 @@ describe("GatewayServer (external server mode)", () => {
     const ws = await connectAndAuth(`ws://localhost:${port}/ws`, "gw_valid");
     await sendVersionChanged(ws, [TEST_INTEGRATION]);
 
-    expect(gateway.connectedGateways).toHaveLength(1);
-    expect(gateway.connectedGateways[0].organizationId).toBe("org_1");
+    expect(bastion.connectedBastions).toHaveLength(1);
+    expect(bastion.connectedBastions[0].organizationId).toBe("org_1");
     ws.close();
   });
 
@@ -498,7 +498,7 @@ describe("GatewayServer (external server mode)", () => {
       }
     });
 
-    const result = await gateway.callToolForOrg(
+    const result = await bastion.callToolForOrg(
       "org_1",
       "test-integration",
       "echo",
@@ -510,40 +510,40 @@ describe("GatewayServer (external server mode)", () => {
 
   it("shutdown cleans up connections without closing external server", async () => {
     let disconnected = false;
-    gateway.onGatewayDisconnected = () => { disconnected = true; };
+    bastion.onBastionDisconnected = () => { disconnected = true; };
 
     const ws = await connectAndAuth(`ws://localhost:${port}/ws`, "gw_valid");
     await sendVersionChanged(ws, []);
-    expect(gateway.connectedGateways).toHaveLength(1);
+    expect(bastion.connectedBastions).toHaveLength(1);
 
-    gateway.shutdown();
+    bastion.shutdown();
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(gateway.connectedGateways).toHaveLength(0);
+    expect(bastion.connectedBastions).toHaveLength(0);
     expect(disconnected).toBe(true);
 
     // HTTP server is still running — can accept new connections
     const ws2 = await connectAndAuth(`ws://localhost:${port}/ws`, "gw_valid");
     await sendVersionChanged(ws2, []);
-    expect(gateway.connectedGateways).toHaveLength(1);
+    expect(bastion.connectedBastions).toHaveLength(1);
     ws2.close();
   });
 
   it("socket error events do not crash and are surfaced via onSocketError", async () => {
     // An unhandled "error" event on the server-side socket would throw at the
     // process level and take down the host service (JO-6988 class of failure).
-    const errors: Array<{ error: Error; gatewayId: string | null }> = [];
-    gateway = new GatewayServer({
+    const errors: Array<{ error: Error; bastionId: string | null }> = [];
+    bastion = new BastionServer({
       validateToken: async (token) =>
         token === "gw_valid" ? { organizationId: "org_1" } : null,
       pingIntervalMs: 0,
-      onSocketError: (error, gw) => errors.push({ error, gatewayId: gw?.id ?? null }),
+      onSocketError: (error, gw) => errors.push({ error, bastionId: gw?.id ?? null }),
     });
     httpServer.removeAllListeners("upgrade");
     httpServer.on("upgrade", (req, socket, head) => {
       wss.handleUpgrade(req, socket, head, (ws) => {
         serverSockets.push(ws);
-        gateway.handleConnection(ws);
+        bastion.handleConnection(ws);
       });
     });
 
@@ -558,26 +558,26 @@ describe("GatewayServer (external server mode)", () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0].error.message).toBe("read ECONNRESET");
-    expect(errors[0].gatewayId).toBe(gateway.connectedGateways[0].id);
+    expect(errors[0].bastionId).toBe(bastion.connectedBastions[0].id);
     ws.close();
   });
 
   it("startHeartbeat sends pings", async () => {
     // Recreate with heartbeat enabled
-    gateway.shutdown();
-    gateway = new GatewayServer({
+    bastion.shutdown();
+    bastion = new BastionServer({
       validateToken: async (token) =>
         token === "gw_valid" ? { organizationId: "org_1" } : null,
       pingIntervalMs: 100,
     });
-    gateway.startHeartbeat();
+    bastion.startHeartbeat();
 
-    // Re-wire the upgrade handler to the new gateway instance
+    // Re-wire the upgrade handler to the new bastion instance
     httpServer.removeAllListeners("upgrade");
     httpServer.on("upgrade", (req, socket, head) => {
       if (req.url === "/ws") {
         wss.handleUpgrade(req, socket, head, (ws) => {
-          gateway.handleConnection(ws);
+          bastion.handleConnection(ws);
         });
       } else {
         socket.destroy();

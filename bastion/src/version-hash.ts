@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Integration } from "journal-gateway-protocol";
+import type { Integration } from "journal-bastion-protocol";
 
 /**
  * Compute a stable content hash for a list of integrations.
