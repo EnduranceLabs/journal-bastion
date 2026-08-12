@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the single package, @journal/bastion.
+# Publish the single package, @journal-labs/bastion.
 #
 # The CLI, the hub library and the wire schemas all ship in this one package as
 # subpath exports (".", "./hub", "./protocol"). There is nothing to keep in

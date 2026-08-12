@@ -1,5 +1,5 @@
 {
-  "name": "@journal/bastion",
+  "name": "@journal-labs/bastion",
   "version": "0.1.0",
   "description": "Outbound bastion for connecting MCP servers and skills to Journal",
   "license": "MIT",

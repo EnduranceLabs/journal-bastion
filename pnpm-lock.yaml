@@ -57,7 +57,7 @@ importers:
 
   testing/integration/ts:
     dependencies:
-      '@journal/bastion':
+      '@journal-labs/bastion':
         specifier: link:../../..
         version: link:../../..
     devDependencies:

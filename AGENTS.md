@@ -67,7 +67,7 @@ The Docker database end-to-end tests are separate from `pnpm test:all`.
 
 ## Versioning & releases
 
-One publishable package, `@journal/bastion`, so there is one version and nothing
+One publishable package, `@journal-labs/bastion`, so there is one version and nothing
 to keep in lockstep. The CLI, the hub library and the wire schemas ship inside it as the
 `.`, `./hub` and `./protocol` subpath exports. Never edit the version by hand:
 

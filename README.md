@@ -26,7 +26,7 @@ infrastructure, and no inbound ports are required.
 ### npm
 
 ```bash
-npm install -g @journal/bastion
+npm install -g @journal-labs/bastion
 
 JOURNAL_BASTION_TOKEN=gw_your_token journal-bastion --config bastion.json
 ```
