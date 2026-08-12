@@ -1,17 +1,17 @@
-# @journal/bastion/protocol
+# @journal-labs/bastion/protocol
 
 Shared TypeScript types and [Zod](https://zod.dev) schemas for the Journal
 Bastion WebSocket protocol.
 
 Most applications should install `journal-bastion` or
-`@journal/bastion` instead. Install this package directly when you
+`@journal-labs/bastion` instead. Install this package directly when you
 need to validate protocol messages, share bastion types across packages, or
 build custom tooling around the protocol.
 
 ## Install
 
 ```bash
-npm install @journal/bastion/protocol
+npm install @journal-labs/bastion/protocol
 ```
 
 ## Exports
@@ -34,7 +34,7 @@ import {
   ServiceMessageSchema,
   type BastionMessage,
   type ToolResult,
-} from "@journal/bastion/protocol";
+} from "@journal-labs/bastion/protocol";
 
 export function parseBastionMessage(raw: string): BastionMessage {
   return BastionMessageSchema.parse(JSON.parse(raw));
@@ -56,9 +56,9 @@ ServiceMessageSchema.parse({
 Journal Bastion packages release in lockstep. Use matching versions of:
 
 - npm `journal-bastion`
-- npm `@journal/bastion` for TypeScript services
-- npm `@journal/bastion/protocol`
-- PyPI `@journal/bastion` for Python services
+- npm `@journal-labs/bastion` for TypeScript services
+- npm `@journal-labs/bastion/protocol`
+- PyPI `@journal-labs/bastion` for Python services
 
 ## More Documentation
 

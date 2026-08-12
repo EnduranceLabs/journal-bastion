@@ -138,7 +138,7 @@ is sent to the bastion and used as the parent for remote tool execution spans.
 Journal Bastion packages release in lockstep. Use matching versions of:
 
 - npm `journal-bastion`
-- npm `@journal/bastion` (import `@journal/bastion/hub`) for TypeScript services
+- npm `@journal-labs/bastion` (import `@journal-labs/bastion/hub`) for TypeScript services
 - 
 - the unpublished Python client in `clients/python`
 
