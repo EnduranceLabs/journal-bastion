@@ -219,7 +219,11 @@ export function parseConfig(
   argv: string[] = process.argv
 ): RuntimeConfig {
   const token = readBastionEnv(env, "TOKEN") ?? "";
-  const url = readBastionEnv(env, "URL") ?? "wss://bastion.journal.one/v1";
+  // No path: the service accepts the WebSocket upgrade at the root, and a
+  // default of `/v1` produced a 404 on every connection attempt, retried
+  // forever. An explicit URL is still passed through verbatim, path included,
+  // so a self-hosted hub can mount its connection handler under any prefix.
+  const url = readBastionEnv(env, "URL") ?? "wss://bastion.journal.one";
   const logLevel = (env.LOG_LEVEL ?? "info") as
     | "debug"
     | "info"

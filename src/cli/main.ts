@@ -31,7 +31,7 @@ Options:
 
 Environment:
   JOURNAL_BASTION_TOKEN     Auth token from Journal (required, starts with gw_).
-  JOURNAL_BASTION_URL       Journal endpoint (default wss://bastion.journal.one/v1).
+  JOURNAL_BASTION_URL       Journal endpoint (default wss://bastion.journal.one).
   JOURNAL_BASTION_CONFIG    Config file path, or inline JSON.
   JOURNAL_BASTION_ENV_FILE  .env file path (auto-detects ./.env if unset).
   LOG_LEVEL                 debug | info | warn | error (default info).

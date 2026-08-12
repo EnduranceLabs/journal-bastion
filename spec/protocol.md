@@ -9,7 +9,7 @@ Organizations need their AI agents to access internal tools — databases, obser
 ## Transport
 
 - **Protocol:** WebSocket (`wss://`)
-- **Endpoint:** `wss://bastion.journal.one/v1`
+- **Endpoint:** `wss://bastion.journal.one` (the upgrade is served at the root; the protocol is versioned by the `protocolVersion` field in `authenticate`, not by the path)
 - **Direction:** Outbound from bastion to service (bastion initiates)
 - **Encoding:** JSON (UTF-8)
 - **Framing:** Each WebSocket text frame contains exactly one JSON message
