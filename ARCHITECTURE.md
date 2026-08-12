@@ -8,7 +8,7 @@ implement the service side. The Python client is standalone.
 
 ### Shared protocol
 
-- `protocol/` — the `@journal/bastion/protocol` package: pure Zod schemas and
+- `protocol/` — the `@journal-labs/bastion/protocol` package: pure Zod schemas and
   TypeScript types shared by the bastion and client libraries (Integration,
   ToolResult, Skill, message schemas, IntegrationProvider, BastionConfig, errors).
 
@@ -92,11 +92,11 @@ The JSON Schema lives at `spec/bastion-config.schema.json` (wire it up with
 
 ## Client libraries
 
-- `src/hub/` — the `@journal/bastion/hub` subpath export. Implements the
+- `src/hub/` — the `@journal-labs/bastion/hub` subpath export. Implements the
   service side of the protocol: runs a WebSocket server, authenticates bastions,
   auto-pulls tools and skills on `version_changed`, and exposes `callTool()`,
   `getVersions()`, `getTools()`, and `getSkills()`.
-- `hub/python/` — the `@journal/bastion` PyPI package. The same
+- `hub/python/` — the `@journal-labs/bastion` PyPI package. The same
   functionality, built on `websockets` and `asyncio`.
 - `testing/integration/` — integration tests that run the real bastion against each
   client library and verify lifecycle, catalog pulls, version pulls, and disconnect

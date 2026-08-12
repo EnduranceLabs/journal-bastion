@@ -1,15 +1,15 @@
 # Publishing
 
-One publishable package: **`@journal/bastion`**.
+One publishable package: **`@journal-labs/bastion`**.
 
 The CLI (`bin: journal-bastion`), the hub library and the wire schemas all ship
 inside it as subpath exports:
 
 | Import | What |
 |---|---|
-| `@journal/bastion` | the CLI entry point |
-| `@journal/bastion/hub` | `BastionServer`, for the Journal side of the socket |
-| `@journal/bastion/protocol` | the shared Zod wire schemas |
+| `@journal-labs/bastion` | the CLI entry point |
+| `@journal-labs/bastion/hub` | `BastionServer`, for the Journal side of the socket |
+| `@journal-labs/bastion/protocol` | the shared Zod wire schemas |
 
 There is nothing to keep in version lockstep, and the Python client in
 `clients/python` is not published — install it from source if you need it.
@@ -30,13 +30,13 @@ publish would fail on a free account.
 
 ```bash
 VERSION=$(node -p "require('../../package.json').version")
-curl -fsSL "https://registry.npmjs.org/@journal%2Fbastion/$VERSION" | jq -r '.version'
-npm view @journal/bastion dist-tags
+curl -fsSL "https://registry.npmjs.org/@journal-labs%2Fbastion/$VERSION" | jq -r '.version'
+npm view @journal-labs/bastion dist-tags
 ```
 
 A customer installs it with:
 
 ```bash
-npm install -g @journal/bastion
+npm install -g @journal-labs/bastion
 journal-bastion --version
 ```

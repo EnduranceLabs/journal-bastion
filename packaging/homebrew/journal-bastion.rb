@@ -2,7 +2,7 @@ class JournalBastion < Formula
   desc "Connect your tools to the Journal agent via an outbound WebSocket bastion"
   homepage "https://github.com/EnduranceLabs/journal-bastion"
   # url and sha256 are updated by packaging/homebrew/publish.sh.
-  url "https://registry.npmjs.org/@journal/bastion/-/bastion-0.1.0.tgz"
+  url "https://registry.npmjs.org/@journal-labs/bastion/-/bastion-0.1.0.tgz"
   sha256 "b27d1445ca82eaed906363c881f9e1f04f3fc578e994fccb99b3c8cf2d285086"
   license "MIT"
 
