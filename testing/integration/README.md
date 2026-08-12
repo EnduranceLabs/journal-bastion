@@ -33,9 +33,9 @@ Run the Python suite:
 
 ```bash
 PYTHON_BIN=${PYTHON:-python3}
-"$PYTHON_BIN" -m venv clients/python/.venv
-. clients/python/.venv/bin/activate
+"$PYTHON_BIN" -m venv hub/python/.venv
+. hub/python/.venv/bin/activate
 python -m pip install -q --upgrade pip
-python -m pip install -q -e "./clients/python[dev]"
+python -m pip install -q -e "./hub/python[dev]"
 pytest testing/integration/python
 ```

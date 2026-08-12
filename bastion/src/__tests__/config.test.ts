@@ -64,7 +64,7 @@ describe("parseConfig", () => {
 
   it("uses default URL when not specified", () => {
     const config = parseConfig(baseEnv({ JOURNAL_BASTION_CONFIG: "{}" }), []);
-    expect(config.url).toBe("wss://gateway.journal.one/v1");
+    expect(config.url).toBe("wss://bastion.journal.one/v1");
   });
 
   it("uses default log level when not specified", () => {

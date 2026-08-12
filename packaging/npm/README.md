@@ -14,9 +14,9 @@ the four versions disagree.
 | Package | Registry | Location |
 |---------|----------|----------|
 | `journal-bastion` | npm | `bastion/` |
-| `journal-bastion-client` | npm | `clients/typescript/` |
+| `journal-bastion-hub` | npm | `hub/typescript/` |
 | `journal-bastion-protocol` | npm | `protocol/` |
-| `journal-bastion-client` | PyPI | `clients/python/` |
+| `journal-bastion-hub` | PyPI | `hub/python/` |
 
 ## First-time setup
 
@@ -37,7 +37,7 @@ VERSION=0.8.1 # replace with the release version
 ```
 
 This rewrites the version in all three `package.json` files and
-`clients/python/pyproject.toml`, then updates the lockfile.
+`hub/python/pyproject.toml`, then updates the lockfile.
 
 ### 2. Commit the bump
 
@@ -63,7 +63,7 @@ git push origin "v$VERSION"
 
 Builds all packages, then publishes `journal-bastion-protocol` first (the others
 depend on it), followed by `journal-bastion` and the npm
-`journal-bastion-client`.
+`journal-bastion-hub`.
 
 If npm requires browser-based authentication, run the script from an interactive
 terminal and open the URL that npm prints. A non-interactive agent session can
@@ -74,7 +74,7 @@ which packages are already live and publish only the missing package if needed:
 ```bash
 npm view journal-bastion-protocol@"$VERSION" version
 npm view journal-bastion@"$VERSION" version
-npm view journal-bastion-client@"$VERSION" version
+npm view journal-bastion-hub@"$VERSION" version
 ```
 
 The npm packages were previously published as `@journal.one/bastion`,
@@ -84,7 +84,7 @@ packages are published and verified:
 
 ```bash
 npm deprecate @journal.one/bastion@"<=0.7.0" "Renamed to journal-bastion. Install journal-bastion@0.8.0 or newer."
-npm deprecate @journal.one/bastion-client@"<=0.7.0" "Renamed to journal-bastion-client. Install journal-bastion-client@0.8.0 or newer."
+npm deprecate @journal.one/bastion-client@"<=0.7.0" "Renamed to journal-bastion-hub. Install journal-bastion-hub@0.8.0 or newer."
 npm deprecate @journal.one/bastion-protocol@"<=0.7.0" "Renamed to journal-bastion-protocol. Install journal-bastion-protocol@0.8.0 or newer."
 ```
 
@@ -136,8 +136,8 @@ first.
 ```bash
 npm view journal-bastion-protocol@"$VERSION" version
 npm view journal-bastion@"$VERSION" version
-npm view journal-bastion-client@"$VERSION" version
-curl -fsSL "https://pypi.org/pypi/journal-bastion-client/$VERSION/json" | jq -r '.info.version'
+npm view journal-bastion-hub@"$VERSION" version
+curl -fsSL "https://pypi.org/pypi/journal-bastion-hub/$VERSION/json" | jq -r '.info.version'
 docker buildx imagetools inspect "ghcr.io/endurancelabs/journal-bastion:$VERSION"
 docker buildx imagetools inspect ghcr.io/endurancelabs/journal-bastion:latest
 ```

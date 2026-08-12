@@ -21,7 +21,7 @@ from .types import (
     ImageContent,
 )
 
-logger = logging.getLogger("journal_bastion_client")
+logger = logging.getLogger("journal_bastion_hub")
 logger.addHandler(logging.NullHandler())
 
 

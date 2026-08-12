@@ -1,6 +1,6 @@
-# journal-bastion-client
+# journal-bastion-hub
 
-[![PyPI](https://img.shields.io/pypi/v/journal-bastion-client)](https://pypi.org/project/journal-bastion-client/)
+[![PyPI](https://img.shields.io/pypi/v/journal-bastion-hub)](https://pypi.org/project/journal-bastion-hub/)
 
 Python service-side library for the Journal Bastion protocol. Use this package
 in the service that accepts bastion WebSocket connections, validates bastion
@@ -14,7 +14,7 @@ If you want to run the customer-side bastion process, install the npm package
 Requires Python 3.11 or newer.
 
 ```bash
-pip install journal-bastion-client
+pip install journal-bastion-hub
 ```
 
 ## Quick Start
@@ -23,7 +23,7 @@ pip install journal-bastion-client
 import asyncio
 import os
 
-from journal_bastion_client import BastionServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
 
 async def validate_token(token: str) -> TokenValidationResult | None:
@@ -64,7 +64,7 @@ asyncio.run(main())
 
 The library never prints to stdout by itself. Route callbacks into your own
 logger, metrics, and tracing stack. If `on_socket_error` is not provided,
-unexpected connection errors go to the `journal_bastion_client` logger, which is
+unexpected connection errors go to the `journal_bastion_hub` logger, which is
 silent by default unless your application configures logging.
 
 ## Key APIs
@@ -138,9 +138,9 @@ is sent to the bastion and used as the parent for remote tool execution spans.
 Journal Bastion packages release in lockstep. Use matching versions of:
 
 - npm `journal-bastion`
-- npm `journal-bastion-client` for TypeScript services
+- npm `journal-bastion-hub` for TypeScript services
 - npm `journal-bastion-protocol`
-- PyPI `journal-bastion-client` for Python services
+- PyPI `journal-bastion-hub` for Python services
 
 ## More Documentation
 

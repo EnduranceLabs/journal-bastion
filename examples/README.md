@@ -7,8 +7,8 @@ Runnable starting points for the two sides of the Journal Bastion protocol.
 | [`bastion.json`](./bastion.json) | Sample bastion config (stdio + streamable-http servers, a skills dir). The `$schema` line gives you autocomplete and validation in editors like VS Code. |
 | [`bastion.env.example`](./bastion.env.example) | Environment variables required by `bastion.json`. |
 | [`integrations/`](./integrations) | Customer-facing MCP integration examples, including SQL database configs and a curated enterprise MCP server catalog. |
-| [`client-server.ts`](./client-server.ts) | Minimal service-side server using `journal-bastion-client`. |
-| [`client_server.py`](./client_server.py) | The same, using `journal-bastion-client`. |
+| [`hub-server.ts`](./hub-server.ts) | Minimal service-side server using `journal-bastion-hub`. |
+| [`hub_server.py`](./hub_server.py) | The same, using `journal-bastion-hub`. |
 
 ## Try it end to end
 
@@ -16,12 +16,12 @@ Runnable starting points for the two sides of the Journal Bastion protocol.
 
    ```bash
    # TypeScript
-   npm install journal-bastion-client
-   npx tsx client-server.ts
+   npm install journal-bastion-hub
+   npx tsx hub-server.ts
 
    # or Python
-   pip install journal-bastion-client
-   python client_server.py
+   pip install journal-bastion-hub
+   python hub_server.py
    ```
 
    Both listen on `ws://localhost:8080` and accept the token `gw_demo`.

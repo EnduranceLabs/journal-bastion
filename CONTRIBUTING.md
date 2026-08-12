@@ -12,7 +12,7 @@ pnpm install
 pnpm build
 
 # Build TypeScript client
-pnpm build:client
+pnpm build:hub
 
 # Type check protocol, bastion, and TypeScript client
 pnpm typecheck
@@ -24,7 +24,7 @@ pnpm check:lockfiles
 pnpm test
 
 # Run TypeScript client tests
-pnpm test:client
+pnpm test:hub
 
 # Run TypeScript integration tests
 pnpm test:integration
@@ -73,10 +73,10 @@ callbacks such as `onSocketError` / `on_socket_error`.
 +-------------+        +------------------+        +-----------+
 ```
 
-### TypeScript (`journal-bastion-client`)
+### TypeScript (`journal-bastion-hub`)
 
 ```typescript
-import { BastionServer } from "journal-bastion-client";
+import { BastionServer } from "journal-bastion-hub";
 
 const server = new BastionServer({
   port: 8080,
@@ -93,10 +93,10 @@ console.log(result.content);
 await server.stop();
 ```
 
-### Python (`journal-bastion-client`)
+### Python (`journal-bastion-hub`)
 
 ```python
-from journal_bastion_client import BastionServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
 async def validate(token):
     if token == "gw_expected":
@@ -127,7 +127,7 @@ The bastion communicates with Journal over WebSocket using a simple JSON protoco
 ## Packaging
 
 All four packages (`journal-bastion-protocol`, `journal-bastion`, the npm
-`journal-bastion-client`, and the PyPI `journal-bastion-client`) release in
+`journal-bastion-hub`, and the PyPI `journal-bastion-hub`) release in
 lockstep at the same version. Bump them together
 with `packaging/bump-version.sh` — never edit versions by hand. See
 [packaging/npm/README.md](./packaging/npm/README.md) for the full release runbook
@@ -143,5 +143,5 @@ docker build -f packaging/docker/Dockerfile -t journal-bastion .
 
 ## Pre-PR checklist
 
-- Run `pnpm build`, `pnpm build:client`, and `pnpm typecheck` before opening a PR or publishing. Use `pnpm -r build` when you need every TypeScript workspace package built.
+- Run `pnpm build`, `pnpm build:hub`, and `pnpm typecheck` before opening a PR or publishing. Use `pnpm -r build` when you need every TypeScript workspace package built.
 - Run `pnpm check:lockfiles` before opening a PR.

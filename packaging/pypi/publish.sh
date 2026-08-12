@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and publish the Python client (journal-bastion-client) to PyPI.
+# Build and publish the Python client (journal-bastion-hub) to PyPI.
 # Requires: Python 3.11+, build, twine, and a configured PyPI token.
 # Set PYTHON=/path/to/python3.11 if python3 is older on your machine.
 set -euo pipefail
@@ -25,7 +25,7 @@ done
 echo "Checking version lockstep across all four packages..."
 "$ROOT/packaging/check-lockstep.sh"
 
-cd "$ROOT/clients/python"
+cd "$ROOT/hub/python"
 
 echo "Cleaning previous build artifacts..."
 rm -rf dist build ./*.egg-info
@@ -36,4 +36,4 @@ echo "Building sdist and wheel..."
 echo "Uploading to PyPI..."
 "$PYTHON_BIN" -m twine upload dist/*
 
-echo "Done. Published journal-bastion-client to PyPI."
+echo "Done. Published journal-bastion-hub to PyPI."

@@ -22,7 +22,7 @@ echo "Publishing journal-bastion-protocol..."
 echo "Publishing journal-bastion..."
 (cd "$ROOT/bastion" && pnpm publish --access public --no-git-checks)
 
-echo "Publishing journal-bastion-client..."
-(cd "$ROOT/clients/typescript" && pnpm publish --access public --no-git-checks)
+echo "Publishing journal-bastion-hub..."
+(cd "$ROOT/hub/typescript" && pnpm publish --access public --no-git-checks)
 
 echo "Done. All packages published."

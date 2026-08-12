@@ -122,7 +122,7 @@ Run `journal-bastion --help` for the full list of flags and environment variable
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `JOURNAL_BASTION_TOKEN` | yes | — | Auth token from Journal (starts with `gw_`) |
-| `JOURNAL_BASTION_URL` | no | `wss://gateway.journal.one/v1` | Journal endpoint |
+| `JOURNAL_BASTION_URL` | no | `wss://bastion.journal.one/v1` | Journal endpoint |
 | `JOURNAL_BASTION_CONFIG` | no | — | Path to config file, or inline JSON (detected by leading `{`) |
 | `JOURNAL_BASTION_ENV_FILE` | no | — | Path to `.env` file (auto-detects `.env` in cwd if not set) |
 | `LOG_LEVEL` | no | `info` | Log level: `debug`, `info`, `warn`, `error` |

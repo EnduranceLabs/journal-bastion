@@ -18,7 +18,7 @@ All commands run from the repository root:
 pnpm build            # build protocol and bastion
 pnpm typecheck        # protocol, bastion, and TS client
 pnpm test             # bastion tests
-pnpm test:client      # TypeScript client tests
+pnpm test:hub      # TypeScript client tests
 pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 pnpm test:all         # root-script suites above

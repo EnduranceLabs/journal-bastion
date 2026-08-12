@@ -1,7 +1,7 @@
 """Minimal Journal Bastion client server (Python).
 
-    pip install journal-bastion-client
-    python client_server.py
+    pip install journal-bastion-hub
+    python hub_server.py
 
 Then point a bastion at ws://localhost:8080 with token "gw_demo":
 
@@ -12,7 +12,7 @@ Then point a bastion at ws://localhost:8080 with token "gw_demo":
 
 import asyncio
 
-from journal_bastion_client import BastionServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
 
 async def validate_token(token: str) -> TokenValidationResult | None:

@@ -9,7 +9,7 @@ Organizations need their AI agents to access internal tools — databases, obser
 ## Transport
 
 - **Protocol:** WebSocket (`wss://`)
-- **Endpoint:** `wss://gateway.journal.one/v1`
+- **Endpoint:** `wss://bastion.journal.one/v1`
 - **Direction:** Outbound from bastion to service (bastion initiates)
 - **Encoding:** JSON (UTF-8)
 - **Framing:** Each WebSocket text frame contains exactly one JSON message

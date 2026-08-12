@@ -60,7 +60,7 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.19.11)
 
-  clients/typescript:
+  hub/typescript:
     dependencies:
       journal-bastion-protocol:
         specifier: workspace:*
@@ -97,9 +97,9 @@ importers:
 
   testing/integration/ts:
     dependencies:
-      journal-bastion-client:
+      journal-bastion-hub:
         specifier: workspace:*
-        version: link:../../../clients/typescript
+        version: link:../../../hub/typescript
     devDependencies:
       '@types/node':
         specifier: ^22

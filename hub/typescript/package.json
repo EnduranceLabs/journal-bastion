@@ -1,5 +1,5 @@
 {
-  "name": "journal-bastion-client",
+  "name": "journal-bastion-hub",
   "version": "0.9.0",
   "description": "TypeScript service-side client for accepting Journal Bastion connections",
   "license": "MIT",
@@ -15,7 +15,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EnduranceLabs/journal-bastion.git",
-    "directory": "clients/typescript"
+    "directory": "hub/typescript"
   },
   "bugs": {
     "url": "https://github.com/EnduranceLabs/journal-bastion/issues"

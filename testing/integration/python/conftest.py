@@ -4,7 +4,7 @@ import subprocess
 
 import pytest_asyncio
 
-from journal_bastion_client import BastionServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
 BASTION_BIN = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "bastion", "dist", "main.js"

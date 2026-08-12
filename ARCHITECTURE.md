@@ -92,11 +92,11 @@ The JSON Schema lives at `spec/bastion-config.schema.json` (wire it up with
 
 ## Client libraries
 
-- `clients/typescript/` — the `journal-bastion-client` npm package. Implements the
+- `hub/typescript/` — the `journal-bastion-hub` npm package. Implements the
   service side of the protocol: runs a WebSocket server, authenticates bastions,
   auto-pulls tools and skills on `version_changed`, and exposes `callTool()`,
   `getVersions()`, `getTools()`, and `getSkills()`.
-- `clients/python/` — the `journal-bastion-client` PyPI package. The same
+- `hub/python/` — the `journal-bastion-hub` PyPI package. The same
   functionality, built on `websockets` and `asyncio`.
 - `testing/integration/` — integration tests that run the real bastion against each
   client library and verify lifecycle, catalog pulls, version pulls, and disconnect

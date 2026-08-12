@@ -11,7 +11,7 @@ import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BastionServer } from "../../clients/typescript/dist/server.js";
+import { BastionServer } from "../../hub/typescript/dist/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");

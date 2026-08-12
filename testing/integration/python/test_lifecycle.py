@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from journal_bastion_client import BastionServer, TokenValidationResult
+from journal_bastion_hub import BastionServer, TokenValidationResult
 
 
 BASTION_BIN = os.path.join(

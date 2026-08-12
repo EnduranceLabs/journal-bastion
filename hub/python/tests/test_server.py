@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 import websockets
 
-from journal_bastion_client import (
+from journal_bastion_hub import (
     BastionServer,
     TokenValidationResult,
     ConnectedBastion,

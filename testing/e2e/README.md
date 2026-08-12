@@ -64,16 +64,16 @@ docker compose -f testing/e2e/docker-compose.yml down -v
 
 ## Shipped example scripts
 
-The shipped `examples/client-server.ts` / `examples/client_server.py` +
+The shipped `examples/hub-server.ts` / `examples/hub_server.py` +
 `examples/bastion.json` were also run by hand against this Postgres. To repeat:
 
 ```bash
 # make the workspace client resolvable to the TS example (mimics `npm install`)
 mkdir -p examples/node_modules
-ln -sfn ../../clients/typescript examples/node_modules/journal-bastion-client
+ln -sfn ../../hub/typescript examples/node_modules/journal-bastion-hub
 
 # TS (node 22 strips the types; no tsx needed)
-( cd examples && node --experimental-strip-types client-server.ts ) &
+( cd examples && node --experimental-strip-types hub-server.ts ) &
 JOURNAL_BASTION_TOKEN=gw_demo node bastion/dist/main.js \
   --env-file testing/e2e/env/examples-postgres.env --config examples/bastion.json
 ```

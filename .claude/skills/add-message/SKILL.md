@@ -95,10 +95,10 @@ it("rejects my_new with missing field1", () => {
 
 ## 6. Keep clients and docs in sync
 
-- TypeScript clients re-export protocol types from `clients/typescript/src/types.ts`.
+- TypeScript clients re-export protocol types from `hub/typescript/src/types.ts`.
   Add the new schema/type there if it should be public from the client package.
 - Python clients define their own dataclasses and message handling in
-  `clients/python/journal_bastion_client/`. Update them when the message changes
+  `hub/python/journal_bastion_hub/`. Update them when the message changes
   runtime behavior or public data shapes.
 - If the message changes lifecycle, timeout, retry, trace, or catalog behavior,
   update `README.md`, `ARCHITECTURE.md`, and the relevant client README files.
@@ -108,7 +108,7 @@ it("rejects my_new with missing field1", () => {
 ```bash
 pnpm -r build         # Build workspace TypeScript packages
 pnpm test             # Bastion tests
-pnpm test:client      # TypeScript client tests
+pnpm test:hub      # TypeScript client tests
 pnpm test:integration # TypeScript integration (bastion <-> TS client)
 pnpm test:python      # Python client tests
 ```
@@ -118,6 +118,6 @@ pnpm test:python      # Python client tests
 - `spec/protocol.md` — Protocol specification
 - `protocol/src/messages.ts` — Zod schemas and discriminated unions
 - `protocol/src/index.ts` — Re-exports
-- `clients/typescript/src/types.ts` — Client package re-exports
-- `clients/python/journal_bastion_client/` — Python client types and handlers
+- `hub/typescript/src/types.ts` — Client package re-exports
+- `hub/python/journal_bastion_hub/` — Python client types and handlers
 - `bastion/src/__tests__/messages.test.ts` — Message parsing tests

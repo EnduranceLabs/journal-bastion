@@ -219,7 +219,7 @@ export function parseConfig(
   argv: string[] = process.argv
 ): RuntimeConfig {
   const token = readBastionEnv(env, "TOKEN") ?? "";
-  const url = readBastionEnv(env, "URL") ?? "wss://gateway.journal.one/v1";
+  const url = readBastionEnv(env, "URL") ?? "wss://bastion.journal.one/v1";
   const logLevel = (env.LOG_LEVEL ?? "info") as
     | "debug"
     | "info"
