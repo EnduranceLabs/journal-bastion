@@ -1,2 +1,3 @@
 packages:
+  - packaging/docker/runtime
   - testing/integration/ts

@@ -33,6 +33,59 @@ JOURNAL_BASTION_TOKEN=gw_your_token journal-bastion --config bastion.json
 
 ### Docker
 
+The Docker image automatically enables supported integrations when their
+complete environment-variable set is present. No config file or inbound port is
+needed for the built-in integrations:
+
+```bash
+docker run --rm \
+  --env-file /etc/journal/bastion.env \
+  ghcr.io/endurancelabs/journal-bastion:latest
+```
+
+```dotenv
+JOURNAL_BASTION_TOKEN=gw_your_token
+
+# Datadog API/application-key mode
+DD_SITE=datadoghq.com
+DD_API_KEY=...
+DD_APP_KEY=...
+
+# PostHog hosted MCP
+POSTHOG_PERSONAL_API_KEY=phx_...
+POSTHOG_PROJECT_ID=12345
+
+# MongoDB official MCP server
+MDB_MCP_CONNECTION_STRING=mongodb+srv://readonly-user:...@cluster.example.net/app
+```
+
+Alternatively, set `DATADOG_ACCESS_TOKEN` to use a Datadog personal or service
+access token. The image adds the `Bearer` prefix internally. The image defaults
+to Datadog's `core` toolset; set `DATADOG_MCP_TOOLSETS` or
+`DATADOG_MCP_OMIT_TOOLS` to narrow the catalog. Use a dedicated Datadog identity
+with `mcp_read` and only the underlying product read permissions.
+
+PostHog uses its hosted MCP endpoint in project-pinned, read-only CLI mode. Use
+a personal API key created with PostHog's `MCP Server` preset; project ingestion
+keys beginning with `phc_` are rejected.
+
+The image includes the official `mongodb-mcp-server` at version `2.1.0` and
+runs it locally over stdio. Automatic mode forces its read-only mode, disables
+telemetry and Atlas administration, and removes connect, disconnect, and export
+tools. This tool filter is not the database security boundary: use a dedicated
+MongoDB user whose database roles allow reads only from the intended databases
+and collections.
+
+An integration is disabled when none of its recognized variables are present.
+A complete set enables it. A partial set exits before connecting and names the
+missing variables without printing values. Explicit `--config` or
+`JOURNAL_BASTION_CONFIG` is a full replacement and disables automatic discovery.
+
+The npm CLI does not enable automatic discovery unless
+`JOURNAL_BASTION_AUTO_INTEGRATIONS=true` is set explicitly.
+
+### Docker with explicit config
+
 To validate the Docker image locally, create a `.env` file next to
 `bastion.json` that contains `JOURNAL_BASTION_TOKEN=gw_your_token`, then run:
 
@@ -125,7 +178,40 @@ Run `journal-bastion --help` for the full list of flags and environment variable
 | `JOURNAL_BASTION_URL` | no | `wss://bastion.journal.one` | Journal endpoint. Set this only to reach a different service; an explicit path is sent as given. |
 | `JOURNAL_BASTION_CONFIG` | no | — | Path to config file, or inline JSON (detected by leading `{`) |
 | `JOURNAL_BASTION_ENV_FILE` | no | — | Path to `.env` file (auto-detects `.env` in cwd if not set) |
+| `JOURNAL_BASTION_AUTO_INTEGRATIONS` | no | `false` in npm, `true` in the Docker image | Generate built-in integrations from environment variables when no explicit config is supplied |
 | `LOG_LEVEL` | no | `info` | Log level: `debug`, `info`, `warn`, `error` |
+
+#### Automatic Datadog integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATADOG_ACCESS_TOKEN` | alternative A | — | Personal or service access token; mutually exclusive with the key pair |
+| `DATADOG_API_KEY` / `DD_API_KEY` | alternative B | — | Datadog API key; requires an application key |
+| `DATADOG_APP_KEY` / `DD_APP_KEY` / `DD_APPLICATION_KEY` | alternative B | — | Datadog application key |
+| `DATADOG_SITE` / `DD_SITE` | no | `datadoghq.com` | Datadog site used to select the regional MCP endpoint |
+| `DATADOG_MCP_TOOLSETS` | no | `core` | Comma-separated Datadog MCP toolsets |
+| `DATADOG_MCP_OMIT_TOOLS` | no | — | Comma-separated tool names removed from the selected toolsets |
+| `DATADOG_MCP_URL` | no | regional endpoint | Advanced HTTPS endpoint override |
+
+#### Automatic PostHog integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTHOG_PERSONAL_API_KEY` | yes | — | Personal API key created with PostHog's `MCP Server` preset |
+| `POSTHOG_PROJECT_ID` | yes | — | Project id used to pin the MCP session and remove project switching |
+| `POSTHOG_FEATURES` | no | — | Comma-separated PostHog feature categories exposed through CLI mode |
+| `POSTHOG_TOOLS` | no | — | Comma-separated exact tool names, unioned with `POSTHOG_FEATURES` |
+| `POSTHOG_MCP_URL` | no | `https://mcp.posthog.com/mcp` | Advanced HTTPS endpoint override; `mode=cli` and `readonly=true` are enforced |
+
+#### Automatic MongoDB integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MDB_MCP_CONNECTION_STRING` | yes | — | MongoDB or MongoDB SRV URL for a database-enforced read-only user |
+
+MongoDB automatic mode is available in the Docker image, which contains the
+official server executable. npm CLI users can still use MongoDB through explicit
+configuration when `mongodb-mcp-server` is installed separately.
 
 ### Config file
 

@@ -90,6 +90,87 @@ describe("parseConfig", () => {
     expect(config.logLevel).toBe("debug");
   });
 
+  it("keeps automatic integrations disabled for npm users by default", () => {
+    const config = parseConfig(
+      baseEnv({
+        DATADOG_API_KEY: "api-secret",
+        DATADOG_APP_KEY: "app-secret",
+      }),
+      []
+    );
+
+    expect(config.mcpServers).toEqual([]);
+    expect(config.automaticIntegrations).toBeUndefined();
+  });
+
+  it("resolves Datadog automatically when explicitly enabled", () => {
+    const config = parseConfig(
+      baseEnv({
+        JOURNAL_BASTION_AUTO_INTEGRATIONS: "true",
+        DD_API_KEY: "api-secret",
+        DD_APP_KEY: "app-secret",
+        DD_SITE: "datadoghq.com",
+      }),
+      []
+    );
+
+    expect(config.mcpServers).toEqual([
+      expect.objectContaining({ id: "datadog", transport: "streamable-http" }),
+    ]);
+    expect(config.mcpEnvVars.get("datadog")).toEqual({
+      DD_API_KEY: "api-secret",
+      DD_APPLICATION_KEY: "app-secret",
+    });
+    expect(config.automaticIntegrations).toEqual({
+      enabled: ["datadog"],
+      disabled: ["posthog", "mongodb"],
+    });
+  });
+
+  it("resolves PostHog and MongoDB automatically when explicitly enabled", () => {
+    const mongoConnection = "mongodb://readonly:secret@mongo:27017/spendflo";
+    const config = parseConfig(
+      baseEnv({
+        JOURNAL_BASTION_AUTO_INTEGRATIONS: "true",
+        POSTHOG_PERSONAL_API_KEY: "phx_personal-secret",
+        POSTHOG_PROJECT_ID: "12345",
+        MDB_MCP_CONNECTION_STRING: mongoConnection,
+      }),
+      []
+    );
+
+    expect(config.mcpServers.map((server) => server.id)).toEqual([
+      "posthog",
+      "mongodb",
+    ]);
+    expect(config.mcpEnvVars.get("posthog")).toEqual({
+      Authorization: "Bearer phx_personal-secret",
+      "x-posthog-project-id": "12345",
+    });
+    expect(config.mcpEnvVars.get("mongodb")).toEqual({
+      MDB_MCP_CONNECTION_STRING: mongoConnection,
+    });
+    expect(config.automaticIntegrations).toEqual({
+      enabled: ["posthog", "mongodb"],
+      disabled: ["datadog"],
+    });
+  });
+
+  it("treats explicit empty config as a full replacement for automatic integrations", () => {
+    const config = parseConfig(
+      baseEnv({
+        JOURNAL_BASTION_AUTO_INTEGRATIONS: "true",
+        JOURNAL_BASTION_CONFIG: "{}",
+        DATADOG_API_KEY: "api-secret",
+        DATADOG_APP_KEY: "app-secret",
+      }),
+      []
+    );
+
+    expect(config.mcpServers).toEqual([]);
+    expect(config.automaticIntegrations).toBeUndefined();
+  });
+
   // A self-hosted hub can feed BastionServer.handleConnection from a route
   // under any prefix, so an explicit path must survive untouched. This is the
   // guard against "fix the /v1 default" turning into "strip every path".
