@@ -70,6 +70,6 @@ For local Docker builds and contract validation, run:
 packaging/docker/publish.sh
 ```
 
-The first GHCR publication creates the package privately. An organization
-administrator must make `journal-bastion` public before the workflow's anonymous
-pull verification can pass. This is a one-time package bootstrap action.
+The GHCR package is public. The workflow verifies anonymous pulls of each native
+digest before creating release tags, then verifies the final multi-platform tag
+before creating the GitHub release.
