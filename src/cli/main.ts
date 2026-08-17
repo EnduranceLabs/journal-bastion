@@ -34,6 +34,9 @@ Environment:
   JOURNAL_BASTION_URL       Journal endpoint (default wss://bastion.journal.one).
   JOURNAL_BASTION_CONFIG    Config file path, or inline JSON.
   JOURNAL_BASTION_ENV_FILE  .env file path (auto-detects ./.env if unset).
+  JOURNAL_BASTION_AUTO_INTEGRATIONS
+                             Generate supported integrations from environment
+                             variables when no explicit config is supplied.
   LOG_LEVEL                 debug | info | warn | error (default info).
 
 Example:
@@ -103,6 +106,12 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const logger = new Logger(config.logLevel);
+  if (config.automaticIntegrations) {
+    logger.info("Automatic integrations resolved", {
+      enabled: config.automaticIntegrations.enabled,
+      disabled: config.automaticIntegrations.disabled,
+    });
+  }
   for (const warning of config.warnings) {
     logger.warn(warning);
   }

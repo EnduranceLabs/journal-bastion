@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import type { BastionConfig } from "../protocol/index.js";
+import {
+  automaticIntegrationsEnabled,
+  resolveAutomaticIntegrations,
+} from "./auto-integrations.js";
 
 // --- Discriminated union for MCP server configs ---
 
@@ -57,6 +61,10 @@ export type RuntimeConfig = BastionConfig & {
   mcpEnvVars: Map<string, Record<string, string>>;
   skillsDir: string | null;
   warnings: string[];
+  automaticIntegrations?: {
+    enabled: string[];
+    disabled: string[];
+  };
 };
 
 const WS_SCHEMES = new Set(["ws:", "wss:", "http:", "https:"]);
@@ -232,11 +240,14 @@ export function parseConfig(
 
   const base = OperationalSchema.parse({ token, url, logLevel });
 
-  // Resolve config: --config arg > JOURNAL_BASTION_CONFIG env var > empty config
+  // Resolve config: --config arg > JOURNAL_BASTION_CONFIG env var > automatic
+  // integrations (when explicitly enabled) > empty config.
   const cliConfigPath = parseCliConfigArg(argv);
   const envConfig = readBastionEnv(env, "CONFIG") ?? null;
 
   let configFile: BastionConfigFile;
+  let resolutionEnv = env;
+  let automaticIntegrations: RuntimeConfig["automaticIntegrations"];
 
   if (cliConfigPath) {
     configFile = readConfigFile(cliConfigPath);
@@ -253,6 +264,16 @@ export function parseConfig(
     } else {
       configFile = readConfigFile(envConfig);
     }
+  } else if (automaticIntegrationsEnabled(env)) {
+    const automatic = resolveAutomaticIntegrations(env, {
+      allowInsecureUrls: env.NODE_ENV === "test",
+    });
+    configFile = automatic.configFile;
+    resolutionEnv = { ...env, ...automatic.derivedEnv };
+    automaticIntegrations = {
+      enabled: automatic.enabledIntegrationIds,
+      disabled: automatic.disabledIntegrationIds,
+    };
   } else {
     configFile = BastionConfigFileSchema.parse({});
   }
@@ -264,7 +285,10 @@ export function parseConfig(
         ]
       : [];
 
-  const { mcpServers, mcpEnvVars } = resolveConfigFile(configFile, env);
+  const { mcpServers, mcpEnvVars } = resolveConfigFile(
+    configFile,
+    resolutionEnv
+  );
 
   return {
     ...base,
@@ -272,5 +296,6 @@ export function parseConfig(
     mcpEnvVars,
     skillsDir: configFile.skillsDir,
     warnings,
+    ...(automaticIntegrations ? { automaticIntegrations } : {}),
   };
 }
