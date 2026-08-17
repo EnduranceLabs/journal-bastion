@@ -14,6 +14,16 @@ const DATADOG_ENV_NAMES = [
   "DD_SITE",
 ] as const;
 
+const POSTHOG_ENV_NAMES = [
+  "POSTHOG_PERSONAL_API_KEY",
+  "POSTHOG_PROJECT_ID",
+  "POSTHOG_FEATURES",
+  "POSTHOG_TOOLS",
+  "POSTHOG_MCP_URL",
+] as const;
+
+const MONGODB_ENV_NAMES = ["MDB_MCP_CONNECTION_STRING"] as const;
+
 const DATADOG_SITE_ENDPOINTS: Record<string, string> = {
   "app.datadoghq.com": "https://mcp.datadoghq.com/v1/mcp",
   "datadoghq.com": "https://mcp.datadoghq.com/v1/mcp",
@@ -40,6 +50,9 @@ const INTERNAL_DATADOG_AUTHORIZATION =
   "JOURNAL_BASTION_INTERNAL_DATADOG_AUTHORIZATION";
 const INTERNAL_DATADOG_API_KEY = "JOURNAL_BASTION_INTERNAL_DATADOG_API_KEY";
 const INTERNAL_DATADOG_APP_KEY = "JOURNAL_BASTION_INTERNAL_DATADOG_APP_KEY";
+const DEFAULT_POSTHOG_MCP_URL = "https://mcp.posthog.com/mcp";
+const INTERNAL_POSTHOG_AUTHORIZATION =
+  "JOURNAL_BASTION_INTERNAL_POSTHOG_AUTHORIZATION";
 
 export interface AutomaticIntegrationsResult {
   configFile: BastionConfigFile;
@@ -58,15 +71,19 @@ function value(
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function hasDatadogIntent(env: Record<string, string | undefined>): boolean {
-  return DATADOG_ENV_NAMES.some((name) =>
+function hasIntent(
+  env: Record<string, string | undefined>,
+  names: readonly string[]
+): boolean {
+  return names.some((name) =>
     Object.prototype.hasOwnProperty.call(env, name)
   );
 }
 
 function aliasedValue(
   env: Record<string, string | undefined>,
-  names: string[]
+  names: string[],
+  integrationName: string
 ): string | undefined {
   const configured = names
     .map((name) => ({ name, value: value(env, name) }))
@@ -78,7 +95,7 @@ function aliasedValue(
     const first = configured[0].value;
     if (configured.some((entry) => entry.value !== first)) {
       throw new Error(
-        `Conflicting Datadog environment aliases: ${configured
+        `Conflicting ${integrationName} environment aliases: ${configured
           .map((entry) => entry.name)
           .join(", ")}`
       );
@@ -133,7 +150,8 @@ function resolveDatadogUrl(
     endpoint = parsed.toString();
   } else {
     const site = (
-      aliasedValue(env, ["DATADOG_SITE", "DD_SITE"]) ?? DEFAULT_DATADOG_SITE
+      aliasedValue(env, ["DATADOG_SITE", "DD_SITE"], "Datadog") ??
+      DEFAULT_DATADOG_SITE
     ).toLowerCase();
     const mapped = DATADOG_SITE_ENDPOINTS[site];
     if (!mapped) {
@@ -171,37 +189,67 @@ function resolveDatadogUrl(
   return url.toString();
 }
 
-export function automaticIntegrationsEnabled(
-  env: Record<string, string | undefined>
-): boolean {
-  const raw = value(env, "JOURNAL_BASTION_AUTO_INTEGRATIONS");
-  if (raw === undefined) return false;
-  const normalized = raw.toLowerCase();
-  if (normalized === "true") return true;
-  if (normalized === "false") return false;
-  throw new Error("JOURNAL_BASTION_AUTO_INTEGRATIONS must be true or false");
-}
-
-export function resolveAutomaticIntegrations(
+function resolvePosthogUrl(
   env: Record<string, string | undefined>,
-  options: { allowInsecureUrls?: boolean } = {}
-): AutomaticIntegrationsResult {
-  if (!hasDatadogIntent(env)) {
-    return {
-      configFile: { mcpServers: [], skillsDir: null },
-      derivedEnv: {},
-      enabledIntegrationIds: [],
-      disabledIntegrationIds: ["datadog"],
-    };
+  allowInsecureUrls: boolean
+): string {
+  const endpoint = value(env, "POSTHOG_MCP_URL") ?? DEFAULT_POSTHOG_MCP_URL;
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new Error("POSTHOG_MCP_URL must be a valid URL");
   }
 
+  if (url.username || url.password) {
+    throw new Error("POSTHOG_MCP_URL must not contain credentials");
+  }
+  if (url.protocol !== "https:" && !allowInsecureUrls) {
+    throw new Error("POSTHOG_MCP_URL must use https");
+  }
+  if (!(url.protocol === "https:" || url.protocol === "http:")) {
+    throw new Error("POSTHOG_MCP_URL must use http or https");
+  }
+
+  url.searchParams.set("mode", "cli");
+  url.searchParams.set("readonly", "true");
+
+  const features = value(env, "POSTHOG_FEATURES");
+  if (features) {
+    url.searchParams.set(
+      "features",
+      normalizeCommaList(features, "POSTHOG_FEATURES")
+    );
+  }
+
+  const tools = value(env, "POSTHOG_TOOLS");
+  if (tools) {
+    url.searchParams.set("tools", normalizeCommaList(tools, "POSTHOG_TOOLS"));
+  }
+
+  return url.toString();
+}
+
+function resolveDatadogIntegration(
+  env: Record<string, string | undefined>,
+  allowInsecureUrls: boolean
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasIntent(env, DATADOG_ENV_NAMES)) return null;
+
   const accessToken = value(env, "DATADOG_ACCESS_TOKEN");
-  const apiKey = aliasedValue(env, ["DATADOG_API_KEY", "DD_API_KEY"]);
-  const appKey = aliasedValue(env, [
-    "DATADOG_APP_KEY",
-    "DD_APP_KEY",
-    "DD_APPLICATION_KEY",
-  ]);
+  const apiKey = aliasedValue(
+    env,
+    ["DATADOG_API_KEY", "DD_API_KEY"],
+    "Datadog"
+  );
+  const appKey = aliasedValue(
+    env,
+    ["DATADOG_APP_KEY", "DD_APP_KEY", "DD_APPLICATION_KEY"],
+    "Datadog"
+  );
   const hasAccessToken = accessToken !== undefined;
   const hasAnyKeyPairValue = apiKey !== undefined || appKey !== undefined;
 
@@ -241,25 +289,156 @@ export function resolveAutomaticIntegrations(
   }
 
   return {
-    configFile: {
-      mcpServers: [
-        {
-          id: "datadog",
-          name: "Datadog",
-          description:
-            "Read-only investigation of Datadog logs, metrics, traces, monitors, incidents, dashboards, and services",
-          transport: "streamable-http",
-          url: resolveDatadogUrl(
-            env,
-            options.allowInsecureUrls ?? false
-          ),
-          headers,
-        },
-      ],
-      skillsDir: null,
+    server: {
+      id: "datadog",
+      name: "Datadog",
+      description:
+        "Read-only investigation of Datadog logs, metrics, traces, monitors, incidents, dashboards, and services",
+      transport: "streamable-http",
+      url: resolveDatadogUrl(env, allowInsecureUrls),
+      headers,
     },
     derivedEnv,
-    enabledIntegrationIds: ["datadog"],
-    disabledIntegrationIds: [],
+  };
+}
+
+function resolvePosthogIntegration(
+  env: Record<string, string | undefined>,
+  allowInsecureUrls: boolean
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasIntent(env, POSTHOG_ENV_NAMES)) return null;
+
+  const personalApiKey = value(env, "POSTHOG_PERSONAL_API_KEY");
+  const projectId = value(env, "POSTHOG_PROJECT_ID");
+  const missing: string[] = [];
+  if (!personalApiKey) missing.push("POSTHOG_PERSONAL_API_KEY");
+  if (!projectId) missing.push("POSTHOG_PROJECT_ID");
+  if (missing.length > 0) {
+    throw new Error(`Incomplete PostHog integration: missing ${missing.join(", ")}`);
+  }
+  const resolvedPersonalApiKey = personalApiKey as string;
+  if (resolvedPersonalApiKey.startsWith("phc_")) {
+    throw new Error(
+      "POSTHOG_PERSONAL_API_KEY must be a personal API key, not a phc_ project ingestion key"
+    );
+  }
+
+  return {
+    server: {
+      id: "posthog",
+      name: "PostHog",
+      description:
+        "Read-only product analytics, feature flags, experiments, errors, logs, replays, and project context",
+      transport: "streamable-http",
+      url: resolvePosthogUrl(env, allowInsecureUrls),
+      headers: {
+        Authorization: INTERNAL_POSTHOG_AUTHORIZATION,
+        "x-posthog-project-id": "POSTHOG_PROJECT_ID",
+      },
+    },
+    derivedEnv: {
+      [INTERNAL_POSTHOG_AUTHORIZATION]: `Bearer ${resolvedPersonalApiKey}`,
+    },
+  };
+}
+
+function resolveMongodbIntegration(
+  env: Record<string, string | undefined>
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasIntent(env, MONGODB_ENV_NAMES)) return null;
+
+  const connectionString = value(env, "MDB_MCP_CONNECTION_STRING");
+  if (!connectionString) {
+    throw new Error(
+      "Incomplete MongoDB integration: missing MDB_MCP_CONNECTION_STRING"
+    );
+  }
+
+  let connectionUrl: URL;
+  try {
+    connectionUrl = new URL(connectionString);
+  } catch {
+    throw new Error("MDB_MCP_CONNECTION_STRING must be a valid MongoDB URL");
+  }
+  if (
+    connectionUrl.protocol !== "mongodb:" &&
+    connectionUrl.protocol !== "mongodb+srv:"
+  ) {
+    throw new Error(
+      "MDB_MCP_CONNECTION_STRING must use mongodb:// or mongodb+srv://"
+    );
+  }
+
+  return {
+    server: {
+      id: "mongodb",
+      name: "MongoDB",
+      description:
+        "Read-only queries and metadata for the configured MongoDB deployment",
+      transport: "stdio",
+      command: "mongodb-mcp-server",
+      args: [
+        "--readOnly",
+        "--telemetry",
+        "disabled",
+        "--loggers",
+        "stderr",
+        "--disabledTools",
+        "atlas,connect,disconnect,export",
+      ],
+      envVars: {
+        MDB_MCP_CONNECTION_STRING: "MDB_MCP_CONNECTION_STRING",
+      },
+    },
+    derivedEnv: {},
+  };
+}
+
+export function automaticIntegrationsEnabled(
+  env: Record<string, string | undefined>
+): boolean {
+  const raw = value(env, "JOURNAL_BASTION_AUTO_INTEGRATIONS");
+  if (raw === undefined) return false;
+  const normalized = raw.toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  throw new Error("JOURNAL_BASTION_AUTO_INTEGRATIONS must be true or false");
+}
+
+export function resolveAutomaticIntegrations(
+  env: Record<string, string | undefined>,
+  options: { allowInsecureUrls?: boolean } = {}
+): AutomaticIntegrationsResult {
+  const allowInsecureUrls = options.allowInsecureUrls ?? false;
+  const resolved = [
+    ["datadog", resolveDatadogIntegration(env, allowInsecureUrls)],
+    ["posthog", resolvePosthogIntegration(env, allowInsecureUrls)],
+    ["mongodb", resolveMongodbIntegration(env)],
+  ] as const;
+
+  const enabled = resolved.flatMap(([id, integration]) =>
+    integration ? [{ id, integration }] : []
+  );
+  const disabled = resolved
+    .filter(([, integration]) => integration === null)
+    .map(([id]) => id);
+
+  return {
+    configFile: {
+      mcpServers: enabled.map(({ integration }) => integration.server),
+      skillsDir: null,
+    },
+    derivedEnv: Object.assign(
+      {},
+      ...enabled.map(({ integration }) => integration.derivedEnv)
+    ),
+    enabledIntegrationIds: enabled.map(({ id }) => id),
+    disabledIntegrationIds: disabled,
   };
 }

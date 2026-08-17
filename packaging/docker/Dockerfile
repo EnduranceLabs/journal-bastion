@@ -7,11 +7,14 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm build
 RUN pnpm --filter=@journal-labs/bastion deploy --prod --legacy /prod/bastion
+RUN pnpm --filter=@journal-labs/bastion-docker-runtime deploy --prod --legacy /prod/mongodb-mcp
 
 FROM base AS runner
 ENV NODE_ENV=production \
-    JOURNAL_BASTION_AUTO_INTEGRATIONS=true
+    JOURNAL_BASTION_AUTO_INTEGRATIONS=true \
+    PATH=/opt/mongodb-mcp/node_modules/.bin:$PATH
 WORKDIR /app
 COPY --from=build --chown=node:node /prod/bastion ./
+COPY --from=build /prod/mongodb-mcp /opt/mongodb-mcp
 USER node
 ENTRYPOINT ["node", "dist/cli/main.js"]

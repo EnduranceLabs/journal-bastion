@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-image="${IMAGE:-journal-bastion:phase1}"
+image="${IMAGE:-journal-bastion:phase2}"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -22,6 +22,10 @@ uid="$(docker run --rm --entrypoint id "$image" -u)"
 version="$(docker run --rm "$image" --version)"
 [ -n "$version" ] || fail "journal-bastion --version returned no value"
 
+mongodb_version="$(docker run --rm --entrypoint mongodb-mcp-server "$image" --version)"
+[ "$mongodb_version" = "2.1.0" ] || \
+  fail "mongodb-mcp-server version was $mongodb_version instead of 2.1.0"
+
 exposed_ports="$(docker image inspect "$image" --format '{{json .Config.ExposedPorts}}')"
 [ "$exposed_ports" = "null" ] || fail "image exposes ports: $exposed_ports"
 
@@ -40,12 +44,38 @@ if grep -q "$partial_secret" <<<"$partial_output"; then
   fail "partial Datadog error leaked the configured secret"
 fi
 
+set +e
+partial_output="$(docker run --rm \
+  -e JOURNAL_BASTION_TOKEN=gw_fixture \
+  -e POSTHOG_PERSONAL_API_KEY="$partial_secret" \
+  "$image" 2>&1)"
+partial_status=$?
+set -e
+[ "$partial_status" -ne 0 ] || fail "partial PostHog config unexpectedly succeeded"
+grep -q 'POSTHOG_PROJECT_ID' <<<"$partial_output" || \
+  fail "partial PostHog error did not name the missing project id"
+if grep -q "$partial_secret" <<<"$partial_output"; then
+  fail "partial PostHog error leaked the configured secret"
+fi
+
+set +e
+partial_output="$(docker run --rm \
+  -e JOURNAL_BASTION_TOKEN=gw_fixture \
+  -e MDB_MCP_CONNECTION_STRING= \
+  "$image" 2>&1)"
+partial_status=$?
+set -e
+[ "$partial_status" -ne 0 ] || fail "partial MongoDB config unexpectedly succeeded"
+grep -q 'MDB_MCP_CONNECTION_STRING' <<<"$partial_output" || \
+  fail "partial MongoDB error did not name the missing connection string"
+
 container_name="journal-bastion-sigterm-$RANDOM"
 docker run -d \
   --name "$container_name" \
   --read-only \
   -e JOURNAL_BASTION_TOKEN=gw_fixture \
   -e JOURNAL_BASTION_URL=ws://127.0.0.1:9 \
+  -e MDB_MCP_CONNECTION_STRING=mongodb://127.0.0.1:27017/fixture \
   "$image" >/dev/null
 
 cleanup() {
@@ -53,9 +83,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-sleep 1
+sleep 2
+mongodb_policy_output="$(docker logs "$container_name" 2>&1)"
+for disabled_tool in connect disconnect export; do
+  grep -q "Prevented registration of $disabled_tool" <<<"$mongodb_policy_output" || \
+    fail "MongoDB $disabled_tool tool was not disabled"
+done
 docker stop --time 5 "$container_name" >/dev/null
 exit_code="$(docker inspect "$container_name" --format '{{.State.ExitCode}}')"
 [ "$exit_code" = "0" ] || fail "SIGTERM exit code was $exit_code"
 
-echo "Docker contract passed: image=$image uid=$uid version=$version"
+echo "Docker contract passed: image=$image uid=$uid version=$version mongodb=$mongodb_version"

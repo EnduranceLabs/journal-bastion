@@ -123,7 +123,36 @@ describe("parseConfig", () => {
     });
     expect(config.automaticIntegrations).toEqual({
       enabled: ["datadog"],
-      disabled: [],
+      disabled: ["posthog", "mongodb"],
+    });
+  });
+
+  it("resolves PostHog and MongoDB automatically when explicitly enabled", () => {
+    const mongoConnection = "mongodb://readonly:secret@mongo:27017/spendflo";
+    const config = parseConfig(
+      baseEnv({
+        JOURNAL_BASTION_AUTO_INTEGRATIONS: "true",
+        POSTHOG_PERSONAL_API_KEY: "phx_personal-secret",
+        POSTHOG_PROJECT_ID: "12345",
+        MDB_MCP_CONNECTION_STRING: mongoConnection,
+      }),
+      []
+    );
+
+    expect(config.mcpServers.map((server) => server.id)).toEqual([
+      "posthog",
+      "mongodb",
+    ]);
+    expect(config.mcpEnvVars.get("posthog")).toEqual({
+      Authorization: "Bearer phx_personal-secret",
+      "x-posthog-project-id": "12345",
+    });
+    expect(config.mcpEnvVars.get("mongodb")).toEqual({
+      MDB_MCP_CONNECTION_STRING: mongoConnection,
+    });
+    expect(config.automaticIntegrations).toEqual({
+      enabled: ["posthog", "mongodb"],
+      disabled: ["datadog"],
     });
   });
 

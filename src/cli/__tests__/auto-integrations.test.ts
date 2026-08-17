@@ -29,12 +29,12 @@ describe("automaticIntegrationsEnabled", () => {
 });
 
 describe("resolveAutomaticIntegrations", () => {
-  it("returns an empty catalog when Datadog is absent", () => {
+  it("returns an empty catalog when automatic integrations are absent", () => {
     expect(resolveAutomaticIntegrations({})).toEqual({
       configFile: { mcpServers: [], skillsDir: null },
       derivedEnv: {},
       enabledIntegrationIds: [],
-      disabledIntegrationIds: ["datadog"],
+      disabledIntegrationIds: ["datadog", "posthog", "mongodb"],
     });
   });
 
@@ -195,5 +195,171 @@ describe("resolveAutomaticIntegrations", () => {
         DATADOG_MCP_URL: "https://user:secret@mcp.example.com/mcp",
       })
     ).toThrow("must not contain credentials");
+  });
+
+  it("builds a project-pinned, read-only PostHog integration", () => {
+    const result = resolveAutomaticIntegrations({
+      POSTHOG_PERSONAL_API_KEY: "phx_personal-secret",
+      POSTHOG_PROJECT_ID: "12345",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["posthog"]);
+    expect(result.disabledIntegrationIds).toEqual(["datadog", "mongodb"]);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "posthog",
+        transport: "streamable-http",
+        url: "https://mcp.posthog.com/mcp?mode=cli&readonly=true",
+        headers: {
+          Authorization: "JOURNAL_BASTION_INTERNAL_POSTHOG_AUTHORIZATION",
+          "x-posthog-project-id": "POSTHOG_PROJECT_ID",
+        },
+      }),
+    ]);
+    expect(result.derivedEnv).toEqual({
+      JOURNAL_BASTION_INTERNAL_POSTHOG_AUTHORIZATION:
+        "Bearer phx_personal-secret",
+    });
+    expect(JSON.stringify(result.configFile)).not.toContain(
+      "phx_personal-secret"
+    );
+  });
+
+  it.each([
+    [
+      { POSTHOG_PERSONAL_API_KEY: "phx_personal-secret" },
+      "POSTHOG_PROJECT_ID",
+    ],
+    [{ POSTHOG_PROJECT_ID: "12345" }, "POSTHOG_PERSONAL_API_KEY"],
+    [{ POSTHOG_FEATURES: "insights" }, "POSTHOG_PERSONAL_API_KEY"],
+  ])("rejects partial PostHog configuration %#", (env, message) => {
+    expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
+  });
+
+  it("rejects a PostHog project ingestion key", () => {
+    expect(() =>
+      resolveAutomaticIntegrations({
+        POSTHOG_PERSONAL_API_KEY: "phc_ingestion-secret",
+        POSTHOG_PROJECT_ID: "12345",
+      })
+    ).toThrow("not a phc_ project ingestion key");
+  });
+
+  it("applies PostHog feature and tool filters while enforcing safe query flags", () => {
+    const result = resolveAutomaticIntegrations({
+      POSTHOG_PERSONAL_API_KEY: "phx_personal-secret",
+      POSTHOG_PROJECT_ID: "12345",
+      POSTHOG_FEATURES: "insights, error_tracking",
+      POSTHOG_TOOLS: "dashboard-get, execute-sql",
+      POSTHOG_MCP_URL:
+        "https://posthog.example.com/custom?mode=tools&readonly=false",
+    });
+    const server = result.configFile.mcpServers[0];
+    const url = new URL(server.url);
+
+    expect(url.searchParams.get("mode")).toBe("cli");
+    expect(url.searchParams.get("readonly")).toBe("true");
+    expect(url.searchParams.get("features")).toBe("insights,error_tracking");
+    expect(url.searchParams.get("tools")).toBe(
+      "dashboard-get,execute-sql"
+    );
+  });
+
+  it("requires a credential-free HTTPS PostHog endpoint outside tests", () => {
+    const base = {
+      POSTHOG_PERSONAL_API_KEY: "phx_personal-secret",
+      POSTHOG_PROJECT_ID: "12345",
+    };
+
+    expect(() =>
+      resolveAutomaticIntegrations({
+        ...base,
+        POSTHOG_MCP_URL: "http://localhost:4000/mcp",
+      })
+    ).toThrow("must use https");
+    expect(() =>
+      resolveAutomaticIntegrations({
+        ...base,
+        POSTHOG_MCP_URL: "https://user:secret@posthog.example.com/mcp",
+      })
+    ).toThrow("must not contain credentials");
+    expect(
+      resolveAutomaticIntegrations(
+        { ...base, POSTHOG_MCP_URL: "http://localhost:4000/mcp" },
+        { allowInsecureUrls: true }
+      ).configFile.mcpServers[0]
+    ).toEqual(expect.objectContaining({ url: expect.stringContaining("http:") }));
+  });
+
+  it("builds a scope-pinned MongoDB stdio integration", () => {
+    const connectionString =
+      "mongodb://readonly:secret@mongo.internal:27017/spendflo";
+    const result = resolveAutomaticIntegrations({
+      MDB_MCP_CONNECTION_STRING: connectionString,
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["mongodb"]);
+    expect(result.disabledIntegrationIds).toEqual(["datadog", "posthog"]);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "mongodb",
+        transport: "stdio",
+        command: "mongodb-mcp-server",
+        args: [
+          "--readOnly",
+          "--telemetry",
+          "disabled",
+          "--loggers",
+          "stderr",
+          "--disabledTools",
+          "atlas,connect,disconnect,export",
+        ],
+        envVars: {
+          MDB_MCP_CONNECTION_STRING: "MDB_MCP_CONNECTION_STRING",
+        },
+      }),
+    ]);
+    expect(result.derivedEnv).toEqual({});
+    expect(JSON.stringify(result.configFile)).not.toContain(connectionString);
+  });
+
+  it.each([
+    [{ MDB_MCP_CONNECTION_STRING: "" }, "missing MDB_MCP_CONNECTION_STRING"],
+    [
+      { MDB_MCP_CONNECTION_STRING: "https://mongo.internal/spendflo" },
+      "must use mongodb:// or mongodb+srv://",
+    ],
+    [
+      { MDB_MCP_CONNECTION_STRING: "not a URL" },
+      "must be a valid MongoDB URL",
+    ],
+  ])("rejects invalid MongoDB configuration %#", (env, message) => {
+    expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
+  });
+
+  it("combines Datadog, PostHog, and MongoDB without putting secrets in config", () => {
+    const secrets = ["dd-api-secret", "dd-app-secret", "phx_secret", "mongo-secret"];
+    const result = resolveAutomaticIntegrations({
+      DATADOG_API_KEY: secrets[0],
+      DATADOG_APP_KEY: secrets[1],
+      POSTHOG_PERSONAL_API_KEY: secrets[2],
+      POSTHOG_PROJECT_ID: "12345",
+      MDB_MCP_CONNECTION_STRING: `mongodb://readonly:${secrets[3]}@mongo:27017/db`,
+    });
+
+    expect(result.enabledIntegrationIds).toEqual([
+      "datadog",
+      "posthog",
+      "mongodb",
+    ]);
+    expect(result.disabledIntegrationIds).toEqual([]);
+    expect(result.configFile.mcpServers.map((server) => server.id)).toEqual([
+      "datadog",
+      "posthog",
+      "mongodb",
+    ]);
+    for (const secret of secrets) {
+      expect(JSON.stringify(result.configFile)).not.toContain(secret);
+    }
   });
 });
