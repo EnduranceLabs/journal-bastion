@@ -14,7 +14,7 @@ inside it as subpath exports:
 There is nothing to keep in version lockstep, and the Python client in
 `clients/python` is not published — install it from source if you need it.
 
-## Release
+## npm release
 
 ```bash
 packaging/bump-version.sh 0.1.0   # sets package.json + the python client
@@ -40,3 +40,36 @@ A customer installs it with:
 npm install -g @journal-labs/bastion
 journal-bastion --version
 ```
+
+## Container release
+
+Container images are published only by GitHub Actions. Direct registry pushes
+from developer machines are intentionally unsupported.
+
+Before tagging, bump the source version and merge the change to `main`:
+
+```bash
+packaging/bump-version.sh 0.2.0
+```
+
+Create the matching tag from the merged `main` commit:
+
+```bash
+git tag -a v0.2.0 -m "Journal Bastion 0.2.0"
+git push origin v0.2.0
+```
+
+The release workflow validates the source version, tests and scans native
+Linux amd64 and arm64 images, publishes a multi-platform manifest to GHCR, and
+creates the GitHub release. It publishes immutable `0.2.0` and commit tags plus
+the movable `0.2` and `latest` tags. Never reuse an existing version tag.
+
+For local Docker builds and contract validation, run:
+
+```bash
+packaging/docker/publish.sh
+```
+
+The first GHCR publication creates the package privately. An organization
+administrator must make `journal-bastion` public before the workflow's anonymous
+pull verification can pass. This is a one-time package bootstrap action.

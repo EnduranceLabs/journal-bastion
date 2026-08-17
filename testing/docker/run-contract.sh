@@ -21,6 +21,9 @@ uid="$(docker run --rm --entrypoint id "$image" -u)"
 
 version="$(docker run --rm "$image" --version)"
 [ -n "$version" ] || fail "journal-bastion --version returned no value"
+if [ -n "${EXPECTED_VERSION:-}" ] && [ "$version" != "$EXPECTED_VERSION" ]; then
+  fail "journal-bastion version was $version instead of $EXPECTED_VERSION"
+fi
 
 mongodb_version="$(docker run --rm --entrypoint mongodb-mcp-server "$image" --version)"
 [ "$mongodb_version" = "2.1.0" ] || \
