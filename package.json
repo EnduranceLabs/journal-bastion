@@ -1,6 +1,6 @@
 {
   "name": "@journal-labs/bastion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Outbound bastion for connecting MCP servers and skills to Journal",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,8 @@
   },
   "packageManager": "pnpm@10.15.1",
   "bin": {
-    "journal-bastion": "./dist/cli/main.js"
+    "journal-bastion": "./dist/cli/main.js",
+    "journal-temporal-mcp": "./dist/integrations/temporal/main.js"
   },
   "main": "./dist/cli/main.js",
   "types": "./dist/cli/main.d.ts",

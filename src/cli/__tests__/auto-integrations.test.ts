@@ -34,7 +34,7 @@ describe("resolveAutomaticIntegrations", () => {
       configFile: { mcpServers: [], skillsDir: null },
       derivedEnv: {},
       enabledIntegrationIds: [],
-      disabledIntegrationIds: ["datadog", "posthog", "mongodb"],
+      disabledIntegrationIds: ["datadog", "posthog", "mongodb", "temporal"],
     });
   });
 
@@ -204,7 +204,11 @@ describe("resolveAutomaticIntegrations", () => {
     });
 
     expect(result.enabledIntegrationIds).toEqual(["posthog"]);
-    expect(result.disabledIntegrationIds).toEqual(["datadog", "mongodb"]);
+    expect(result.disabledIntegrationIds).toEqual([
+      "datadog",
+      "mongodb",
+      "temporal",
+    ]);
     expect(result.configFile.mcpServers).toEqual([
       expect.objectContaining({
         id: "posthog",
@@ -299,7 +303,11 @@ describe("resolveAutomaticIntegrations", () => {
     });
 
     expect(result.enabledIntegrationIds).toEqual(["mongodb"]);
-    expect(result.disabledIntegrationIds).toEqual(["datadog", "posthog"]);
+    expect(result.disabledIntegrationIds).toEqual([
+      "datadog",
+      "posthog",
+      "temporal",
+    ]);
     expect(result.configFile.mcpServers).toEqual([
       expect.objectContaining({
         id: "mongodb",
@@ -337,26 +345,76 @@ describe("resolveAutomaticIntegrations", () => {
     expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
   });
 
-  it("combines Datadog, PostHog, and MongoDB without putting secrets in config", () => {
-    const secrets = ["dd-api-secret", "dd-app-secret", "phx_secret", "mongo-secret"];
+  it("builds a fixed-target Temporal integration and bundled skill", () => {
+    const result = resolveAutomaticIntegrations({
+      TEMPORAL_API_KEY: "temporal-secret",
+      TEMPORAL_NAMESPACE: "journal-test.a1b2c",
+      TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["temporal"]);
+    expect(result.configFile.skillsDir).toMatch(/skills\/temporal-ops\/?$/);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "temporal",
+        transport: "stdio",
+        command: "journal-temporal-mcp",
+        args: [],
+        envVars: {
+          TEMPORAL_API_KEY: "TEMPORAL_API_KEY",
+          TEMPORAL_ADDRESS: "TEMPORAL_ADDRESS",
+          TEMPORAL_NAMESPACE: "TEMPORAL_NAMESPACE",
+        },
+      }),
+    ]);
+    expect(JSON.stringify(result.configFile)).not.toContain("temporal-secret");
+  });
+
+  it.each([
+    [{ TEMPORAL_API_KEY: "secret" }, "TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE"],
+    [
+      {
+        TEMPORAL_API_KEY: "secret",
+        TEMPORAL_NAMESPACE: "journal-test.a1b2c",
+        TEMPORAL_ADDRESS: "other.a1b2c.tmprl.cloud:7233",
+      },
+      "must exactly match",
+    ],
+  ])("rejects invalid Temporal configuration %#", (env, message) => {
+    expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
+  });
+
+  it("combines every automatic integration without putting secrets in config", () => {
+    const secrets = [
+      "dd-api-secret",
+      "dd-app-secret",
+      "phx_secret",
+      "mongo-secret",
+      "temporal-secret",
+    ];
     const result = resolveAutomaticIntegrations({
       DATADOG_API_KEY: secrets[0],
       DATADOG_APP_KEY: secrets[1],
       POSTHOG_PERSONAL_API_KEY: secrets[2],
       POSTHOG_PROJECT_ID: "12345",
       MDB_MCP_CONNECTION_STRING: `mongodb://readonly:${secrets[3]}@mongo:27017/db`,
+      TEMPORAL_API_KEY: secrets[4],
+      TEMPORAL_NAMESPACE: "journal-test.a1b2c",
+      TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
     });
 
     expect(result.enabledIntegrationIds).toEqual([
       "datadog",
       "posthog",
       "mongodb",
+      "temporal",
     ]);
     expect(result.disabledIntegrationIds).toEqual([]);
     expect(result.configFile.mcpServers.map((server) => server.id)).toEqual([
       "datadog",
       "posthog",
       "mongodb",
+      "temporal",
     ]);
     for (const secret of secrets) {
       expect(JSON.stringify(result.configFile)).not.toContain(secret);

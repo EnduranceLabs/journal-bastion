@@ -18,6 +18,16 @@ servers or reference external packages with commands such as `npx -y`.
 | [`database/`](./database) | SQL database examples using Google MCP Toolbox for Databases. |
 | [`common-mcp-servers.md`](./common-mcp-servers.md) | Curated list of reputable public MCP servers for enterprise integrations. |
 
+## Built-in Temporal Cloud integration
+
+The Docker image discovers Temporal Cloud automatically when
+`TEMPORAL_API_KEY`, `TEMPORAL_NAMESPACE`, and `TEMPORAL_ADDRESS` are all set.
+The Namespace must be the full `<namespace>.<account_id>` value and the address
+must be its exact `<namespace>.<account_id>.tmprl.cloud:7233` endpoint. Use a
+dedicated Namespace-scoped Service Account with Read permissions. The bundled
+adapter and `temporal-ops` skill expose inspection only; the target and
+credentials are not caller-selectable.
+
 ## Selection Criteria
 
 The examples and catalog favor MCP servers that are:

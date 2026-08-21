@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/temporalio/skill-temporal-ops",
+  "version": "0.2.0",
+  "commit": "c2f76025159e9580f9e89ff1be1bb5db2e2f428e",
+  "license": "MIT",
+  "curation": "Journal-maintained permanently read-only subset"
+}
