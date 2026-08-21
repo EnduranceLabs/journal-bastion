@@ -57,6 +57,11 @@ POSTHOG_PROJECT_ID=12345
 
 # MongoDB official MCP server
 MDB_MCP_CONNECTION_STRING=mongodb+srv://readonly-user:...@cluster.example.net/app
+
+# Temporal Cloud (full Namespace ID and its matching gRPC endpoint)
+TEMPORAL_API_KEY=...
+TEMPORAL_NAMESPACE=your-namespace.a1b2c
+TEMPORAL_ADDRESS=your-namespace.a1b2c.tmprl.cloud:7233
 ```
 
 Alternatively, set `DATADOG_ACCESS_TOKEN` to use a Datadog personal or service
@@ -75,6 +80,15 @@ telemetry and Atlas administration, and removes connect, disconnect, and export
 tools. This tool filter is not the database security boundary: use a dedicated
 MongoDB user whose database roles allow reads only from the intended databases
 and collections.
+
+The image also includes Temporal CLI `1.8.2`, `tcld` `0.55.0`, and a curated
+edition of Temporal's operations skill. The Temporal integration is permanently
+read-only: it exposes only a fixed inspection manifest, fixes every data-plane
+request to `TEMPORAL_NAMESPACE` and its exact matching endpoint, and accepts no
+caller-selected credentials, target, profile, or config file. Use a dedicated
+Namespace-scoped Temporal Cloud Service Account with Read account and Namespace
+permissions. Allow outbound TCP access to the Namespace endpoint on port `7233`
+and to Temporal Cloud APIs on port `443`.
 
 An integration is disabled when none of its recognized variables are present.
 A complete set enables it. A partial set exits before connecting and names the
@@ -212,6 +226,19 @@ Run `journal-bastion --help` for the full list of flags and environment variable
 MongoDB automatic mode is available in the Docker image, which contains the
 official server executable. npm CLI users can still use MongoDB through explicit
 configuration when `mongodb-mcp-server` is installed separately.
+
+#### Automatic Temporal Cloud integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TEMPORAL_API_KEY` | yes | — | API key for a dedicated read-only Temporal Cloud Service Account |
+| `TEMPORAL_NAMESPACE` | yes | — | Full Namespace ID in `<namespace>.<account_id>` form |
+| `TEMPORAL_ADDRESS` | yes | — | Exact matching `<namespace>.<account_id>.tmprl.cloud:7233` gRPC endpoint |
+
+Temporal automatic mode is supported by the Docker image. It exposes only the
+`inspect` and `read_reference` MCP tools and bundles the `temporal-ops` skill.
+The command target and credential are injected by the integration and cannot be
+overridden through tool arguments.
 
 ### Config file
 

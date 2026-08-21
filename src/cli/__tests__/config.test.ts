@@ -123,7 +123,7 @@ describe("parseConfig", () => {
     });
     expect(config.automaticIntegrations).toEqual({
       enabled: ["datadog"],
-      disabled: ["posthog", "mongodb"],
+      disabled: ["posthog", "mongodb", "temporal"],
     });
   });
 
@@ -152,7 +152,7 @@ describe("parseConfig", () => {
     });
     expect(config.automaticIntegrations).toEqual({
       enabled: ["posthog", "mongodb"],
-      disabled: ["datadog"],
+      disabled: ["datadog", "temporal"],
     });
   });
 

@@ -1,4 +1,9 @@
 import type { BastionConfigFile } from "./config.js";
+import { fileURLToPath } from "node:url";
+import {
+  hasTemporalIntent,
+  parseTemporalConfig,
+} from "../integrations/temporal/config.js";
 
 const DATADOG_ENV_NAMES = [
   "DATADOG_ACCESS_TOKEN",
@@ -400,6 +405,38 @@ function resolveMongodbIntegration(
   };
 }
 
+function resolveTemporalIntegration(
+  env: Record<string, string | undefined>
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasTemporalIntent(env)) return null;
+
+  parseTemporalConfig(env);
+  return {
+    server: {
+      id: "temporal",
+      name: "Temporal Cloud",
+      description:
+        "Read-only Temporal Cloud workflow, worker, schedule, capacity, Namespace, and authentication diagnostics for one configured Namespace",
+      transport: "stdio",
+      command: "journal-temporal-mcp",
+      args: [],
+      envVars: {
+        TEMPORAL_API_KEY: "TEMPORAL_API_KEY",
+        TEMPORAL_ADDRESS: "TEMPORAL_ADDRESS",
+        TEMPORAL_NAMESPACE: "TEMPORAL_NAMESPACE",
+      },
+    },
+    derivedEnv: {},
+  };
+}
+
+function bundledSkillsDir(): string {
+  return fileURLToPath(new URL("../../skills/temporal-ops/", import.meta.url));
+}
+
 export function automaticIntegrationsEnabled(
   env: Record<string, string | undefined>
 ): boolean {
@@ -420,6 +457,7 @@ export function resolveAutomaticIntegrations(
     ["datadog", resolveDatadogIntegration(env, allowInsecureUrls)],
     ["posthog", resolvePosthogIntegration(env, allowInsecureUrls)],
     ["mongodb", resolveMongodbIntegration(env)],
+    ["temporal", resolveTemporalIntegration(env)],
   ] as const;
 
   const enabled = resolved.flatMap(([id, integration]) =>
@@ -432,7 +470,9 @@ export function resolveAutomaticIntegrations(
   return {
     configFile: {
       mcpServers: enabled.map(({ integration }) => integration.server),
-      skillsDir: null,
+      skillsDir: enabled.some(({ id }) => id === "temporal")
+        ? bundledSkillsDir()
+        : null,
     },
     derivedEnv: Object.assign(
       {},

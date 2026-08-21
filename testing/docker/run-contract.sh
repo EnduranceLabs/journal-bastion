@@ -29,6 +29,18 @@ mongodb_version="$(docker run --rm --entrypoint mongodb-mcp-server "$image" --ve
 [ "$mongodb_version" = "2.1.0" ] || \
   fail "mongodb-mcp-server version was $mongodb_version instead of 2.1.0"
 
+temporal_version="$(docker run --rm --entrypoint temporal "$image" --version)"
+grep -q 'temporal version 1.8.2' <<<"$temporal_version" || \
+  fail "temporal CLI version was unexpected: $temporal_version"
+
+tcld_version="$(docker run --rm --entrypoint tcld "$image" version)"
+grep -q '"Version": "v0.55.0"' <<<"$tcld_version" || \
+  fail "tcld version was unexpected: $tcld_version"
+
+temporal_mcp_version="$(docker run --rm --entrypoint journal-temporal-mcp "$image" --version)"
+[ "$temporal_mcp_version" = "0.1.0" ] || \
+  fail "journal-temporal-mcp version was $temporal_mcp_version instead of 0.1.0"
+
 exposed_ports="$(docker image inspect "$image" --format '{{json .Config.ExposedPorts}}')"
 [ "$exposed_ports" = "null" ] || fail "image exposes ports: $exposed_ports"
 
@@ -45,6 +57,20 @@ grep -q 'DATADOG_APP_KEY' <<<"$partial_output" || \
   fail "partial Datadog error did not name the missing application key"
 if grep -q "$partial_secret" <<<"$partial_output"; then
   fail "partial Datadog error leaked the configured secret"
+fi
+
+set +e
+partial_output="$(docker run --rm \
+  -e JOURNAL_BASTION_TOKEN=gw_fixture \
+  -e TEMPORAL_API_KEY="$partial_secret" \
+  "$image" 2>&1)"
+partial_status=$?
+set -e
+[ "$partial_status" -ne 0 ] || fail "partial Temporal config unexpectedly succeeded"
+grep -q 'TEMPORAL_ADDRESS' <<<"$partial_output" || \
+  fail "partial Temporal error did not name the missing address"
+if grep -q "$partial_secret" <<<"$partial_output"; then
+  fail "partial Temporal error leaked the configured secret"
 fi
 
 set +e
@@ -96,4 +122,4 @@ docker stop --time 5 "$container_name" >/dev/null
 exit_code="$(docker inspect "$container_name" --format '{{.State.ExitCode}}')"
 [ "$exit_code" = "0" ] || fail "SIGTERM exit code was $exit_code"
 
-echo "Docker contract passed: image=$image uid=$uid version=$version mongodb=$mongodb_version"
+echo "Docker contract passed: image=$image uid=$uid version=$version mongodb=$mongodb_version temporal=1.8.2 tcld=0.55.0"
