@@ -413,7 +413,14 @@ function resolveTemporalIntegration(
 } | null {
   if (!hasTemporalIntent(env)) return null;
 
-  parseTemporalConfig(env);
+  const config = parseTemporalConfig(env);
+  const authenticationEnvVars: Record<string, string> =
+    config.authMode === "api-key"
+      ? { TEMPORAL_API_KEY: "TEMPORAL_API_KEY" }
+      : {
+          TEMPORAL_TLS_CERT_DATA: "TEMPORAL_TLS_CERT_DATA",
+          TEMPORAL_TLS_KEY_DATA: "TEMPORAL_TLS_KEY_DATA",
+        };
   return {
     server: {
       id: "temporal",
@@ -424,7 +431,7 @@ function resolveTemporalIntegration(
       command: "journal-temporal-mcp",
       args: [],
       envVars: {
-        TEMPORAL_API_KEY: "TEMPORAL_API_KEY",
+        ...authenticationEnvVars,
         TEMPORAL_ADDRESS: "TEMPORAL_ADDRESS",
         TEMPORAL_NAMESPACE: "TEMPORAL_NAMESPACE",
       },

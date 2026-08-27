@@ -21,12 +21,17 @@ servers or reference external packages with commands such as `npx -y`.
 ## Built-in Temporal Cloud integration
 
 The Docker image discovers Temporal Cloud automatically when
-`TEMPORAL_API_KEY`, `TEMPORAL_NAMESPACE`, and `TEMPORAL_ADDRESS` are all set.
+`TEMPORAL_NAMESPACE`, `TEMPORAL_ADDRESS`, and exactly one authentication method
+are set: `TEMPORAL_API_KEY`, or both `TEMPORAL_TLS_CERT_DATA` and
+`TEMPORAL_TLS_KEY_DATA` containing PEM values injected into the container
+environment, including through AWS ECS Secrets Manager integration.
 The Namespace must be the full `<namespace>.<account_id>` value and the address
 must be its exact `<namespace>.<account_id>.tmprl.cloud:7233` endpoint. Use a
 dedicated Namespace-scoped Service Account with Read permissions. The bundled
 adapter and `temporal-ops` skill expose inspection only; the target and
-credentials are not caller-selectable.
+credentials are not caller-selectable. mTLS mode exposes Namespace data-plane
+inspection; API-key mode additionally exposes allowlisted Cloud control-plane
+inspection.
 
 ## Selection Criteria
 

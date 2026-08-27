@@ -13,10 +13,16 @@ export interface ValidatedInvocation {
   args: string[];
 }
 
+export interface TemporalCredentialFiles {
+  tlsCertPath: string;
+  tlsKeyPath: string;
+}
+
 export function buildReadonlyInvocation(
   operation: ReadonlyTemporalOperation,
   suppliedArgs: readonly string[],
-  config: TemporalConfig
+  config: TemporalConfig,
+  credentialFiles?: TemporalCredentialFiles
 ): ValidatedInvocation {
   const definition = READONLY_OPERATIONS[operation];
   if (suppliedArgs.length > MAX_ARGUMENTS) {
@@ -85,6 +91,17 @@ export function buildReadonlyInvocation(
   }
 
   if (definition.executable === "temporal") {
+    if (config.authMode === "mtls" && !credentialFiles) {
+      throw new Error("Temporal mTLS credentials were not materialized");
+    }
+    const authenticationArgs = credentialFiles
+      ? [
+          "--tls-cert-path",
+          credentialFiles.tlsCertPath,
+          "--tls-key-path",
+          credentialFiles.tlsKeyPath,
+        ]
+      : [];
     return {
       executable: "temporal",
       args: [
@@ -94,6 +111,7 @@ export function buildReadonlyInvocation(
         config.address,
         "--namespace",
         config.namespace,
+        ...authenticationArgs,
         "--output",
         "json",
         "--color",
@@ -102,6 +120,12 @@ export function buildReadonlyInvocation(
         "40s",
       ],
     };
+  }
+
+  if (config.authMode === "mtls") {
+    throw new Error(
+      `Operation ${operation} requires Temporal Cloud API-key authentication`
+    );
   }
 
   return {

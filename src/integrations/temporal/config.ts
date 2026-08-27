@@ -1,14 +1,28 @@
 export const TEMPORAL_ENV_NAMES = [
   "TEMPORAL_API_KEY",
+  "TEMPORAL_TLS_CERT_DATA",
+  "TEMPORAL_TLS_KEY_DATA",
   "TEMPORAL_ADDRESS",
   "TEMPORAL_NAMESPACE",
 ] as const;
 
-export interface TemporalConfig {
-  apiKey: string;
+interface TemporalTargetConfig {
   address: string;
   namespace: string;
 }
+
+export type TemporalConfig = TemporalTargetConfig &
+  (
+    | {
+        authMode: "api-key";
+        apiKey: string;
+      }
+    | {
+        authMode: "mtls";
+        tlsCertData: string;
+        tlsKeyData: string;
+      }
+  );
 
 function configuredValue(
   env: Record<string, string | undefined>,
@@ -34,11 +48,60 @@ export function parseTemporalConfig(
   const values = Object.fromEntries(
     TEMPORAL_ENV_NAMES.map((name) => [name, configuredValue(env, name)])
   ) as Record<(typeof TEMPORAL_ENV_NAMES)[number], string | undefined>;
-  const missing = TEMPORAL_ENV_NAMES.filter((name) => !values[name]);
+  const missingTarget = (["TEMPORAL_ADDRESS", "TEMPORAL_NAMESPACE"] as const)
+    .filter((name) => !values[name]);
 
-  if (missing.length > 0) {
+  if (missingTarget.length > 0) {
     throw new Error(
-      `Incomplete Temporal integration: missing ${missing.join(", ")}`
+      `Incomplete Temporal integration: missing ${missingTarget.join(", ")}`
+    );
+  }
+
+  const apiKey = values.TEMPORAL_API_KEY;
+  const tlsCertData = values.TEMPORAL_TLS_CERT_DATA;
+  const tlsKeyData = values.TEMPORAL_TLS_KEY_DATA;
+  const hasMtlsValue = tlsCertData !== undefined || tlsKeyData !== undefined;
+
+  if (apiKey && hasMtlsValue) {
+    throw new Error(
+      "Temporal authentication is ambiguous: set TEMPORAL_API_KEY or TEMPORAL_TLS_CERT_DATA with TEMPORAL_TLS_KEY_DATA, not both"
+    );
+  }
+
+  if (!apiKey && !hasMtlsValue) {
+    throw new Error(
+      "Temporal integration requires TEMPORAL_API_KEY or both TEMPORAL_TLS_CERT_DATA and TEMPORAL_TLS_KEY_DATA"
+    );
+  }
+
+  if (hasMtlsValue && (!tlsCertData || !tlsKeyData)) {
+    const missingCredential = tlsCertData
+      ? "TEMPORAL_TLS_KEY_DATA"
+      : "TEMPORAL_TLS_CERT_DATA";
+    throw new Error(
+      `Incomplete Temporal mTLS integration: missing ${missingCredential}`
+    );
+  }
+
+  if (
+    tlsCertData &&
+    !/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(
+      tlsCertData
+    )
+  ) {
+    throw new Error(
+      "TEMPORAL_TLS_CERT_DATA must contain a PEM-encoded certificate"
+    );
+  }
+
+  if (
+    tlsKeyData &&
+    !/^-----BEGIN ((?:RSA |EC )?PRIVATE KEY)-----[\s\S]+-----END \1-----$/.test(
+      tlsKeyData
+    )
+  ) {
+    throw new Error(
+      "TEMPORAL_TLS_KEY_DATA must contain a PEM-encoded private key"
     );
   }
 
@@ -57,9 +120,19 @@ export function parseTemporalConfig(
     );
   }
 
-  return {
-    apiKey: values.TEMPORAL_API_KEY as string,
+  const target = {
     address,
     namespace,
+  };
+
+  if (apiKey) {
+    return { ...target, authMode: "api-key", apiKey };
+  }
+
+  return {
+    ...target,
+    authMode: "mtls",
+    tlsCertData: tlsCertData as string,
+    tlsKeyData: tlsKeyData as string,
   };
 }

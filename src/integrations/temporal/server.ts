@@ -6,6 +6,7 @@ import {
 import type { TemporalConfig } from "./config.js";
 import {
   isReadonlyTemporalOperation,
+  READONLY_OPERATIONS,
   READONLY_OPERATION_IDS,
 } from "./operations.js";
 import {
@@ -21,13 +22,21 @@ export interface TemporalServerOptions extends TemporalRunnerOptions {
   referenceRoot?: string;
 }
 
+export const TEMPORAL_MCP_VERSION = "0.1.0";
+
 export function createTemporalMcpServer(
   config: TemporalConfig,
   options: TemporalServerOptions = {}
 ): Server {
   const server = new Server(
-    { name: "journal-temporal-mcp", version: "0.1.0" },
+    { name: "journal-temporal-mcp", version: TEMPORAL_MCP_VERSION },
     { capabilities: { tools: {} } }
+  );
+
+  const supportedOperationIds = READONLY_OPERATION_IDS.filter(
+    (operation) =>
+      config.authMode === "api-key" ||
+      READONLY_OPERATIONS[operation].executable === "temporal"
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -42,7 +51,7 @@ export function createTemporalMcpServer(
           additionalProperties: false,
           required: ["operation"],
           properties: {
-            operation: { type: "string", enum: READONLY_OPERATION_IDS },
+            operation: { type: "string", enum: supportedOperationIds },
             args: {
               type: "array",
               maxItems: 32,
@@ -77,7 +86,8 @@ export function createTemporalMcpServer(
         const suppliedArgs = args.args ?? [];
         if (
           typeof operation !== "string" ||
-          !isReadonlyTemporalOperation(operation)
+          !isReadonlyTemporalOperation(operation) ||
+          !supportedOperationIds.includes(operation)
         ) {
           throw new Error("Unknown or non-read-only Temporal operation");
         }
@@ -126,12 +136,21 @@ export function createTemporalMcpServer(
 
       throw new Error("Unknown Temporal tool");
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      let message = error instanceof Error ? error.message : String(error);
+      const secrets =
+        config.authMode === "api-key"
+          ? [config.apiKey]
+          : [config.tlsCertData, config.tlsKeyData];
+      for (const secret of secrets) {
+        if (secret.length > 0) {
+          message = message.split(secret).join("[REDACTED]");
+        }
+      }
       return {
         content: [
           {
             type: "text",
-            text: message.split(config.apiKey).join("[REDACTED]"),
+            text: message,
           },
         ],
         isError: true,

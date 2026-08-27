@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { parseTemporalConfig } from "./config.js";
-import { createTemporalMcpServer } from "./server.js";
+import {
+  createTemporalMcpServer,
+  TEMPORAL_MCP_VERSION,
+} from "./server.js";
 
-const VERSION = "0.1.0";
+const VERSION = TEMPORAL_MCP_VERSION;
 
 async function main(): Promise<void> {
   if (process.argv.includes("--version")) {
