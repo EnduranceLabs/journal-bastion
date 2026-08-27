@@ -46,26 +46,13 @@ describe("Temporal read-only operation policy", () => {
     }
   });
 
-  it("injects fixed mTLS credential paths for data-plane operations", () => {
-    const credentialFiles = {
-      tlsCertPath: "/tmp/credentials/client.pem",
-      tlsKeyPath: "/tmp/credentials/client.key",
-    };
-    const invocation = buildReadonlyInvocation(
-      "cluster.health",
-      [],
-      mtlsConfig,
-      credentialFiles
-    );
-    expect(invocation.args).toEqual(
-      expect.arrayContaining([
-        "--tls-cert-path",
-        credentialFiles.tlsCertPath,
-        "--tls-key-path",
-        credentialFiles.tlsKeyPath,
-      ])
-    );
+  it("keeps mTLS credentials out of data-plane arguments", () => {
+    const invocation = buildReadonlyInvocation("cluster.health", [], mtlsConfig);
     expect(invocation.args).not.toContain("--api-key");
+    expect(invocation.args).not.toContain("--tls-cert-path");
+    expect(invocation.args).not.toContain("--tls-key-path");
+    expect(invocation.args).not.toContain("--tls-cert-data");
+    expect(invocation.args).not.toContain("--tls-key-data");
     expect(invocation.args).not.toContain(mtlsConfig.tlsCertData);
     expect(invocation.args).not.toContain(mtlsConfig.tlsKeyData);
   });

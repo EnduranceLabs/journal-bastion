@@ -41,6 +41,25 @@ temporal_mcp_version="$(docker run --rm --entrypoint journal-temporal-mcp "$imag
 [ "$temporal_mcp_version" = "0.1.0" ] || \
   fail "journal-temporal-mcp version was $temporal_mcp_version instead of 0.1.0"
 
+readonly_mtls_output="$(
+  printf '%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"docker-contract","version":"1.0.0"}}}' \
+    '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"inspect","arguments":{"operation":"cluster.health","args":[]}}}' | \
+    docker run --rm --read-only -i \
+      --entrypoint journal-temporal-mcp \
+      -e TEMPORAL_TLS_CERT_DATA=$'-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----' \
+      -e TEMPORAL_TLS_KEY_DATA=$'-----BEGIN PRIVATE KEY-----\nfixture\n-----END PRIVATE KEY-----' \
+      -e TEMPORAL_NAMESPACE=journal-test.a1b2c \
+      -e TEMPORAL_ADDRESS=journal-test.a1b2c.tmprl.cloud:7233 \
+      "$image"
+)"
+grep -q 'invalid TLS config' <<<"$readonly_mtls_output" || \
+  fail "read-only mTLS probe did not reach Temporal CLI"
+if grep -Eq 'EACCES|EROFS|journal-temporal-mtls' <<<"$readonly_mtls_output"; then
+  fail "mTLS probe attempted to materialize credentials on a read-only filesystem"
+fi
+
 exposed_ports="$(docker image inspect "$image" --format '{{json .Config.ExposedPorts}}')"
 [ "$exposed_ports" = "null" ] || fail "image exposes ports: $exposed_ports"
 
