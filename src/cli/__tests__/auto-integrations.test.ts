@@ -370,6 +370,30 @@ describe("resolveAutomaticIntegrations", () => {
     expect(JSON.stringify(result.configFile)).not.toContain("temporal-secret");
   });
 
+  it("builds a fixed-target Temporal mTLS integration", () => {
+    const result = resolveAutomaticIntegrations({
+      TEMPORAL_TLS_CERT_DATA:
+        "-----BEGIN CERTIFICATE-----\nfixture-certificate\n-----END CERTIFICATE-----",
+      TEMPORAL_TLS_KEY_DATA:
+        "-----BEGIN PRIVATE KEY-----\nfixture-private-key\n-----END PRIVATE KEY-----",
+      TEMPORAL_NAMESPACE: "journal-test.a1b2c",
+      TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["temporal"]);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "temporal",
+        envVars: {
+          TEMPORAL_TLS_CERT_DATA: "TEMPORAL_TLS_CERT_DATA",
+          TEMPORAL_TLS_KEY_DATA: "TEMPORAL_TLS_KEY_DATA",
+          TEMPORAL_ADDRESS: "TEMPORAL_ADDRESS",
+          TEMPORAL_NAMESPACE: "TEMPORAL_NAMESPACE",
+        },
+      }),
+    ]);
+  });
+
   it.each([
     [{ TEMPORAL_API_KEY: "secret" }, "TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE"],
     [
@@ -379,6 +403,15 @@ describe("resolveAutomaticIntegrations", () => {
         TEMPORAL_ADDRESS: "other.a1b2c.tmprl.cloud:7233",
       },
       "must exactly match",
+    ],
+    [
+      {
+        TEMPORAL_TLS_CERT_DATA:
+          "-----BEGIN CERTIFICATE-----\nfixture-certificate\n-----END CERTIFICATE-----",
+        TEMPORAL_NAMESPACE: "journal-test.a1b2c",
+        TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
+      },
+      "TEMPORAL_TLS_KEY_DATA",
     ],
   ])("rejects invalid Temporal configuration %#", (env, message) => {
     expect(() => resolveAutomaticIntegrations(env)).toThrow(message);

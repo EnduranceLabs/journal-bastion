@@ -58,8 +58,10 @@ POSTHOG_PROJECT_ID=12345
 # MongoDB official MCP server
 MDB_MCP_CONNECTION_STRING=mongodb+srv://readonly-user:...@cluster.example.net/app
 
-# Temporal Cloud (full Namespace ID and its matching gRPC endpoint)
-TEMPORAL_API_KEY=...
+# Temporal Cloud (API key or PEM-encoded mTLS client certificate and key)
+# TEMPORAL_API_KEY=...
+TEMPORAL_TLS_CERT_DATA="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+TEMPORAL_TLS_KEY_DATA="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 TEMPORAL_NAMESPACE=your-namespace.a1b2c
 TEMPORAL_ADDRESS=your-namespace.a1b2c.tmprl.cloud:7233
 ```
@@ -85,10 +87,30 @@ The image also includes Temporal CLI `1.8.2`, `tcld` `0.55.0`, and a curated
 edition of Temporal's operations skill. The Temporal integration is permanently
 read-only: it exposes only a fixed inspection manifest, fixes every data-plane
 request to `TEMPORAL_NAMESPACE` and its exact matching endpoint, and accepts no
-caller-selected credentials, target, profile, or config file. Use a dedicated
-Namespace-scoped Temporal Cloud Service Account with Read account and Namespace
-permissions. Allow outbound TCP access to the Namespace endpoint on port `7233`
-and to Temporal Cloud APIs on port `443`.
+caller-selected credentials, target, profile, or config file. Authenticate with
+either a dedicated Namespace-scoped Temporal Cloud Service Account API key or a
+PEM-encoded mTLS client certificate/private-key pair supplied through environment
+variables. API-key mode also exposes the
+allowlisted `tcld` Cloud control-plane reads; mTLS mode exposes only Namespace
+data-plane reads supported by `temporal`. Allow outbound TCP access to the
+Namespace endpoint on port `7233` and, for API-key control-plane reads, Temporal
+Cloud APIs on port `443`.
+
+For mTLS in an orchestrator such as AWS ECS, inject both PEM values directly
+from the secrets manager into the container environment. For a local Docker
+run, the shell can read existing files into those environment variables:
+
+```bash
+TEMPORAL_TLS_CERT_DATA="$(< /etc/temporal/client.pem)" \
+TEMPORAL_TLS_KEY_DATA="$(< /etc/temporal/client.key)" \
+docker run --rm \
+  -e TEMPORAL_TLS_CERT_DATA \
+  -e TEMPORAL_TLS_KEY_DATA \
+  -e TEMPORAL_NAMESPACE \
+  -e TEMPORAL_ADDRESS \
+  -e JOURNAL_BASTION_TOKEN \
+  ghcr.io/endurancelabs/journal-bastion:latest
+```
 
 An integration is disabled when none of its recognized variables are present.
 A complete set enables it. A partial set exits before connecting and names the
@@ -231,14 +253,18 @@ configuration when `mongodb-mcp-server` is installed separately.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `TEMPORAL_API_KEY` | yes | — | API key for a dedicated read-only Temporal Cloud Service Account |
+| `TEMPORAL_API_KEY` | alternative A | — | API key for a dedicated read-only Temporal Cloud Service Account |
+| `TEMPORAL_TLS_CERT_DATA` | alternative B | — | PEM-encoded mTLS client certificate supplied directly in the environment; requires `TEMPORAL_TLS_KEY_DATA` |
+| `TEMPORAL_TLS_KEY_DATA` | alternative B | — | PEM-encoded mTLS private key supplied directly in the environment; requires `TEMPORAL_TLS_CERT_DATA` |
 | `TEMPORAL_NAMESPACE` | yes | — | Full Namespace ID in `<namespace>.<account_id>` form |
 | `TEMPORAL_ADDRESS` | yes | — | Exact matching `<namespace>.<account_id>.tmprl.cloud:7233` gRPC endpoint |
 
 Temporal automatic mode is supported by the Docker image. It exposes only the
 `inspect` and `read_reference` MCP tools and bundles the `temporal-ops` skill.
 The command target and credential are injected by the integration and cannot be
-overridden through tool arguments.
+overridden through tool arguments. Set exactly one authentication method. mTLS
+mode advertises only data-plane operations because Temporal Cloud's `tcld`
+control-plane API requires API-key authentication.
 
 ### Config file
 

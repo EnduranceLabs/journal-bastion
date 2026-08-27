@@ -6,7 +6,17 @@ import {
 } from "../../integrations/temporal/operations.js";
 
 const config = {
+  authMode: "api-key" as const,
   apiKey: "secret",
+  namespace: "journal-test.a1b2c",
+  address: "journal-test.a1b2c.tmprl.cloud:7233",
+};
+const mtlsConfig = {
+  authMode: "mtls" as const,
+  tlsCertData:
+    "-----BEGIN CERTIFICATE-----\nfixture-certificate\n-----END CERTIFICATE-----",
+  tlsKeyData:
+    "-----BEGIN PRIVATE KEY-----\nfixture-private-key\n-----END PRIVATE KEY-----",
   namespace: "journal-test.a1b2c",
   address: "journal-test.a1b2c.tmprl.cloud:7233",
 };
@@ -34,6 +44,36 @@ describe("Temporal read-only operation policy", () => {
     ]) {
       expect(commandWords).not.toContain(forbidden);
     }
+  });
+
+  it("injects fixed mTLS credential paths for data-plane operations", () => {
+    const credentialFiles = {
+      tlsCertPath: "/tmp/credentials/client.pem",
+      tlsKeyPath: "/tmp/credentials/client.key",
+    };
+    const invocation = buildReadonlyInvocation(
+      "cluster.health",
+      [],
+      mtlsConfig,
+      credentialFiles
+    );
+    expect(invocation.args).toEqual(
+      expect.arrayContaining([
+        "--tls-cert-path",
+        credentialFiles.tlsCertPath,
+        "--tls-key-path",
+        credentialFiles.tlsKeyPath,
+      ])
+    );
+    expect(invocation.args).not.toContain("--api-key");
+    expect(invocation.args).not.toContain(mtlsConfig.tlsCertData);
+    expect(invocation.args).not.toContain(mtlsConfig.tlsKeyData);
+  });
+
+  it("rejects Cloud control-plane operations in mTLS mode", () => {
+    expect(() =>
+      buildReadonlyInvocation("namespace.get", [], mtlsConfig)
+    ).toThrow("requires Temporal Cloud API-key authentication");
   });
 
   it("injects the fixed data-plane target and no API key argument", () => {

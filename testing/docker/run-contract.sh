@@ -62,6 +62,19 @@ fi
 set +e
 partial_output="$(docker run --rm \
   -e JOURNAL_BASTION_TOKEN=gw_fixture \
+  -e TEMPORAL_TLS_CERT_DATA=$'-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----' \
+  -e TEMPORAL_NAMESPACE=journal-test.a1b2c \
+  -e TEMPORAL_ADDRESS=journal-test.a1b2c.tmprl.cloud:7233 \
+  "$image" 2>&1)"
+partial_status=$?
+set -e
+[ "$partial_status" -ne 0 ] || fail "partial Temporal mTLS config unexpectedly succeeded"
+grep -q 'TEMPORAL_TLS_KEY_DATA' <<<"$partial_output" || \
+  fail "partial Temporal mTLS error did not name the missing key data"
+
+set +e
+partial_output="$(docker run --rm \
+  -e JOURNAL_BASTION_TOKEN=gw_fixture \
   -e TEMPORAL_API_KEY="$partial_secret" \
   "$image" 2>&1)"
 partial_status=$?
