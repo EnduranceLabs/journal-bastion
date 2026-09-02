@@ -41,7 +41,23 @@ RUN git clone --filter=blob:none https://github.com/temporalio/tcld.git /src/tcl
       -ldflags "-s -w -X github.com/temporalio/tcld/app.version=v${TCLD_VERSION} -X github.com/temporalio/tcld/app.commit=${TCLD_COMMIT}" \
       -o /out/tcld ./cmd/tcld
 
-FROM us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.10.0@sha256:583ca0313f43fe5b84e8661cc3e73d86ecc551b6b22be445d29f98be337c3d6d AS toolbox-build
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS toolbox-build
+ARG TOOLBOX_VERSION=1.10.0
+ARG TOOLBOX_COMMIT=21f972ffd4db17e09087725bc4d72e1f61e4eef8
+RUN git clone --filter=blob:none https://github.com/googleapis/mcp-toolbox.git /src/mcp-toolbox && \
+    cd /src/mcp-toolbox && \
+    git checkout "$TOOLBOX_COMMIT" && \
+    test "$(git rev-parse HEAD)" = "$TOOLBOX_COMMIT" && \
+    test "$(tr -d '\n' < cmd/version.txt)" = "$TOOLBOX_VERSION" && \
+    go get ./... && \
+    go get \
+      golang.org/x/crypto@v0.55.0 \
+      golang.org/x/text@v0.41.0 \
+      google.golang.org/grpc@v1.83.1 && \
+    go mod tidy && \
+    CGO_ENABLED=1 GOOS=linux go build -buildvcs=false \
+      -ldflags "-X github.com/googleapis/mcp-toolbox/cmd.buildType=container.release -X github.com/googleapis/mcp-toolbox/cmd.commitSha=${TOOLBOX_COMMIT}" \
+      -o /out/toolbox .
 
 FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS runner
 ARG IMAGE_VERSION=development
@@ -62,7 +78,7 @@ COPY --from=build /prod/mongodb-mcp /opt/mongodb-mcp
 COPY --from=temporal-cli-build /out/temporal /usr/local/bin/temporal
 COPY --from=temporal-cli-build /etc/ssl/certs /etc/ssl/certs
 COPY --from=tcld-build /out/tcld /usr/local/bin/tcld
-COPY --from=toolbox-build /toolbox /usr/local/bin/toolbox
+COPY --from=toolbox-build /out/toolbox /usr/local/bin/toolbox
 COPY --chown=node:node skills/temporal-ops /app/skills/temporal-ops
 RUN chmod 0755 /app/dist/integrations/temporal/main.js && \
     chmod 0755 /usr/local/bin/toolbox && \
