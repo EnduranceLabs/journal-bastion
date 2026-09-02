@@ -38,6 +38,12 @@ journal-bastion --config examples/integrations/database/toolbox-postgres.json
 For production, put the environment variables in a local env file and pass it
 with `--env-file /etc/journal/bastion.env`.
 
+The Docker image also discovers MySQL automatically. For the simplest setup,
+provide `MYSQL_CONNECTION_STRING=mysql://readonly:password@db.internal:3306/analytics`
+along with the Bastion token. The connection URL is converted to the Toolbox
+fields internally and is never written to the generated config. Use a dedicated
+MySQL user with `SELECT` permission only.
+
 ## Recommended Access Model
 
 Database MCP servers can usually expose an `execute_sql` tool. Treat the database

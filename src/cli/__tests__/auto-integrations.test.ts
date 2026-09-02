@@ -34,7 +34,7 @@ describe("resolveAutomaticIntegrations", () => {
       configFile: { mcpServers: [], skillsDir: null },
       derivedEnv: {},
       enabledIntegrationIds: [],
-      disabledIntegrationIds: ["datadog", "posthog", "mongodb", "temporal"],
+      disabledIntegrationIds: ["datadog", "posthog", "mongodb", "mysql", "temporal"],
     });
   });
 
@@ -207,6 +207,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.disabledIntegrationIds).toEqual([
       "datadog",
       "mongodb",
+      "mysql",
       "temporal",
     ]);
     expect(result.configFile.mcpServers).toEqual([
@@ -306,6 +307,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.disabledIntegrationIds).toEqual([
       "datadog",
       "posthog",
+      "mysql",
       "temporal",
     ]);
     expect(result.configFile.mcpServers).toEqual([
@@ -343,6 +345,75 @@ describe("resolveAutomaticIntegrations", () => {
     ],
   ])("rejects invalid MongoDB configuration %#", (env, message) => {
     expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
+  });
+
+  it("builds a read-only MySQL integration from a connection URL", () => {
+    const result = resolveAutomaticIntegrations({
+      MYSQL_CONNECTION_STRING:
+        "mysql://readonly:p%40ss@mysql.internal:3307/analytics",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["mysql"]);
+    expect(result.disabledIntegrationIds).toEqual([
+      "datadog",
+      "posthog",
+      "mongodb",
+      "temporal",
+    ]);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "mysql",
+        name: "MySQL",
+        transport: "stdio",
+        command: "toolbox",
+        args: ["--prebuilt", "mysql", "--stdio"],
+        envVars: {
+          MYSQL_HOST: "MYSQL_HOST",
+          MYSQL_PORT: "MYSQL_PORT",
+          MYSQL_DATABASE: "MYSQL_DATABASE",
+          MYSQL_USER: "MYSQL_USER",
+          MYSQL_PASSWORD: "MYSQL_PASSWORD",
+        },
+      }),
+    ]);
+    expect(result.derivedEnv).toEqual({
+      MYSQL_HOST: "mysql.internal",
+      MYSQL_PORT: "3307",
+      MYSQL_DATABASE: "analytics",
+      MYSQL_USER: "readonly",
+      MYSQL_PASSWORD: "p@ss",
+    });
+    expect(JSON.stringify(result.configFile)).not.toContain("p%40ss");
+  });
+
+  it("supports separate MySQL connection fields with a default port", () => {
+    const result = resolveAutomaticIntegrations({
+      MYSQL_HOST: "mysql.internal",
+      MYSQL_DATABASE: "analytics",
+      MYSQL_USER: "readonly",
+      MYSQL_PASSWORD: "secret",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["mysql"]);
+    expect(result.derivedEnv).toEqual({ MYSQL_PORT: "3306" });
+  });
+
+  it.each([
+    [{ MYSQL_CONNECTION_STRING: "" }, "missing MYSQL_HOST"],
+    [{ MYSQL_CONNECTION_STRING: "postgres://user:pass@mysql/db" }, "must use mysql://"],
+    [{ MYSQL_CONNECTION_STRING: "mysql://user:pass@mysql" }, "must include a database"],
+    [{ MYSQL_HOST: "mysql" }, "MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD"],
+  ])("rejects invalid MySQL configuration %#", (env, message) => {
+    expect(() => resolveAutomaticIntegrations(env)).toThrow(message);
+  });
+
+  it("rejects mixing a MySQL URL with separate connection fields", () => {
+    expect(() =>
+      resolveAutomaticIntegrations({
+        MYSQL_CONNECTION_STRING: "mysql://readonly:secret@mysql/analytics",
+        MYSQL_HOST: "mysql",
+      })
+    ).toThrow("configuration is ambiguous");
   });
 
   it("builds a fixed-target Temporal integration and bundled skill", () => {
@@ -423,6 +494,7 @@ describe("resolveAutomaticIntegrations", () => {
       "dd-app-secret",
       "phx_secret",
       "mongo-secret",
+      "mysql-secret",
       "temporal-secret",
     ];
     const result = resolveAutomaticIntegrations({
@@ -431,7 +503,8 @@ describe("resolveAutomaticIntegrations", () => {
       POSTHOG_PERSONAL_API_KEY: secrets[2],
       POSTHOG_PROJECT_ID: "12345",
       MDB_MCP_CONNECTION_STRING: `mongodb://readonly:${secrets[3]}@mongo:27017/db`,
-      TEMPORAL_API_KEY: secrets[4],
+      MYSQL_CONNECTION_STRING: `mysql://readonly:${secrets[4]}@mysql/analytics`,
+      TEMPORAL_API_KEY: secrets[5],
       TEMPORAL_NAMESPACE: "journal-test.a1b2c",
       TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
     });
@@ -440,6 +513,7 @@ describe("resolveAutomaticIntegrations", () => {
       "datadog",
       "posthog",
       "mongodb",
+      "mysql",
       "temporal",
     ]);
     expect(result.disabledIntegrationIds).toEqual([]);
@@ -447,6 +521,7 @@ describe("resolveAutomaticIntegrations", () => {
       "datadog",
       "posthog",
       "mongodb",
+      "mysql",
       "temporal",
     ]);
     for (const secret of secrets) {

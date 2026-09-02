@@ -29,6 +29,15 @@ const POSTHOG_ENV_NAMES = [
 
 const MONGODB_ENV_NAMES = ["MDB_MCP_CONNECTION_STRING"] as const;
 
+const MYSQL_ENV_NAMES = [
+  "MYSQL_CONNECTION_STRING",
+  "MYSQL_HOST",
+  "MYSQL_PORT",
+  "MYSQL_DATABASE",
+  "MYSQL_USER",
+  "MYSQL_PASSWORD",
+] as const;
+
 const DATADOG_SITE_ENDPOINTS: Record<string, string> = {
   "app.datadoghq.com": "https://mcp.datadoghq.com/v1/mcp",
   "datadoghq.com": "https://mcp.datadoghq.com/v1/mcp",
@@ -58,6 +67,7 @@ const INTERNAL_DATADOG_APP_KEY = "JOURNAL_BASTION_INTERNAL_DATADOG_APP_KEY";
 const DEFAULT_POSTHOG_MCP_URL = "https://mcp.posthog.com/mcp";
 const INTERNAL_POSTHOG_AUTHORIZATION =
   "JOURNAL_BASTION_INTERNAL_POSTHOG_AUTHORIZATION";
+const DEFAULT_MYSQL_PORT = "3306";
 
 export interface AutomaticIntegrationsResult {
   configFile: BastionConfigFile;
@@ -405,6 +415,103 @@ function resolveMongodbIntegration(
   };
 }
 
+function parseMysqlConnectionString(connectionString: string): Record<string, string> {
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    throw new Error("MYSQL_CONNECTION_STRING must be a valid MySQL URL");
+  }
+
+  if (url.protocol !== "mysql:") {
+    throw new Error("MYSQL_CONNECTION_STRING must use mysql://");
+  }
+  if (!url.hostname) {
+    throw new Error("MYSQL_CONNECTION_STRING must include a host");
+  }
+  if (!url.username) {
+    throw new Error("MYSQL_CONNECTION_STRING must include a user");
+  }
+  if (!url.password) {
+    throw new Error("MYSQL_CONNECTION_STRING must include a password");
+  }
+  if (!url.pathname || url.pathname === "/") {
+    throw new Error("MYSQL_CONNECTION_STRING must include a database");
+  }
+  if (url.search || url.hash) {
+    throw new Error(
+      "MYSQL_CONNECTION_STRING must not include query parameters or a fragment"
+    );
+  }
+
+  return {
+    MYSQL_HOST: url.hostname,
+    MYSQL_PORT: url.port || DEFAULT_MYSQL_PORT,
+    MYSQL_DATABASE: decodeURIComponent(url.pathname.slice(1)),
+    MYSQL_USER: decodeURIComponent(url.username),
+    MYSQL_PASSWORD: decodeURIComponent(url.password),
+  };
+}
+
+function resolveMysqlIntegration(
+  env: Record<string, string | undefined>
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasIntent(env, MYSQL_ENV_NAMES)) return null;
+
+  const connectionString = value(env, "MYSQL_CONNECTION_STRING");
+  const discreteNames = MYSQL_ENV_NAMES.filter(
+    (name) => name !== "MYSQL_CONNECTION_STRING"
+  );
+  const hasDiscreteConfig = discreteNames.some((name) => hasIntent(env, [name]));
+  if (connectionString && hasDiscreteConfig) {
+    throw new Error(
+      "MySQL configuration is ambiguous: set MYSQL_CONNECTION_STRING or MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE, MYSQL_USER, and MYSQL_PASSWORD"
+    );
+  }
+
+  const derivedEnv = connectionString
+    ? parseMysqlConnectionString(connectionString)
+    : {};
+  const resolvedEnv = { ...env, ...derivedEnv };
+  const required = [
+    "MYSQL_HOST",
+    "MYSQL_DATABASE",
+    "MYSQL_USER",
+    "MYSQL_PASSWORD",
+  ];
+  const missing = required.filter((name) => !value(resolvedEnv, name));
+  if (missing.length > 0) {
+    throw new Error(`Incomplete MySQL integration: missing ${missing.join(", ")}`);
+  }
+
+  if (!value(resolvedEnv, "MYSQL_PORT")) {
+    derivedEnv.MYSQL_PORT = DEFAULT_MYSQL_PORT;
+  }
+
+  return {
+    server: {
+      id: "mysql",
+      name: "MySQL",
+      description:
+        "Read-only SQL queries and schema information for the configured MySQL database",
+      transport: "stdio",
+      command: "toolbox",
+      args: ["--prebuilt", "mysql", "--stdio"],
+      envVars: {
+        MYSQL_HOST: "MYSQL_HOST",
+        MYSQL_PORT: "MYSQL_PORT",
+        MYSQL_DATABASE: "MYSQL_DATABASE",
+        MYSQL_USER: "MYSQL_USER",
+        MYSQL_PASSWORD: "MYSQL_PASSWORD",
+      },
+    },
+    derivedEnv,
+  };
+}
+
 function resolveTemporalIntegration(
   env: Record<string, string | undefined>
 ): {
@@ -464,6 +571,7 @@ export function resolveAutomaticIntegrations(
     ["datadog", resolveDatadogIntegration(env, allowInsecureUrls)],
     ["posthog", resolvePosthogIntegration(env, allowInsecureUrls)],
     ["mongodb", resolveMongodbIntegration(env)],
+    ["mysql", resolveMysqlIntegration(env)],
     ["temporal", resolveTemporalIntegration(env)],
   ] as const;
 
