@@ -16,11 +16,11 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BastionServer } from "../../src/hub/dist/server.js";
+import { BastionServer } from "../../dist/hub/server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
-const BASTION_BIN = path.join(REPO, "bastion", "dist", "main.js");
+const BASTION_BIN = path.join(REPO, "dist", "cli", "main.js");
 
 const [, , configPath, envFilePath, integrationId, readSql, writeSql] =
   process.argv;

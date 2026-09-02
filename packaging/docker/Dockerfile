@@ -41,6 +41,8 @@ RUN git clone --filter=blob:none https://github.com/temporalio/tcld.git /src/tcl
       -ldflags "-s -w -X github.com/temporalio/tcld/app.version=v${TCLD_VERSION} -X github.com/temporalio/tcld/app.commit=${TCLD_COMMIT}" \
       -o /out/tcld ./cmd/tcld
 
+FROM us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.10.0@sha256:583ca0313f43fe5b84e8661cc3e73d86ecc551b6b22be445d29f98be337c3d6d AS toolbox-build
+
 FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS runner
 ARG IMAGE_VERSION=development
 ARG VCS_REF=unknown
@@ -60,8 +62,10 @@ COPY --from=build /prod/mongodb-mcp /opt/mongodb-mcp
 COPY --from=temporal-cli-build /out/temporal /usr/local/bin/temporal
 COPY --from=temporal-cli-build /etc/ssl/certs /etc/ssl/certs
 COPY --from=tcld-build /out/tcld /usr/local/bin/tcld
+COPY --from=toolbox-build /toolbox /usr/local/bin/toolbox
 COPY --chown=node:node skills/temporal-ops /app/skills/temporal-ops
 RUN chmod 0755 /app/dist/integrations/temporal/main.js && \
+    chmod 0755 /usr/local/bin/toolbox && \
     ln -s /app/dist/integrations/temporal/main.js /usr/local/bin/journal-temporal-mcp
 USER node
 ENTRYPOINT ["node", "dist/cli/main.js"]

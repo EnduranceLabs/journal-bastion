@@ -37,6 +37,10 @@ tcld_version="$(docker run --rm --entrypoint tcld "$image" version)"
 grep -q '"Version": "v0.55.0"' <<<"$tcld_version" || \
   fail "tcld version was unexpected: $tcld_version"
 
+toolbox_version="$(docker run --rm --entrypoint toolbox "$image" --version)"
+grep -q '1.10.0' <<<"$toolbox_version" || \
+  fail "toolbox version was unexpected: $toolbox_version"
+
 temporal_mcp_version="$(docker run --rm --entrypoint journal-temporal-mcp "$image" --version)"
 [ "$temporal_mcp_version" = "0.1.0" ] || \
   fail "journal-temporal-mcp version was $temporal_mcp_version instead of 0.1.0"
@@ -103,6 +107,21 @@ grep -q 'TEMPORAL_ADDRESS' <<<"$partial_output" || \
   fail "partial Temporal error did not name the missing address"
 if grep -q "$partial_secret" <<<"$partial_output"; then
   fail "partial Temporal error leaked the configured secret"
+fi
+
+set +e
+partial_output="$(docker run --rm \
+  -e JOURNAL_BASTION_TOKEN=gw_fixture \
+  -e MYSQL_CONNECTION_STRING="mysql://readonly:${partial_secret}@mysql/analytics" \
+  -e MYSQL_HOST=mysql \
+  "$image" 2>&1)"
+partial_status=$?
+set -e
+[ "$partial_status" -ne 0 ] || fail "ambiguous MySQL config unexpectedly succeeded"
+grep -q 'configuration is ambiguous' <<<"$partial_output" || \
+  fail "ambiguous MySQL error was not reported"
+if grep -q "$partial_secret" <<<"$partial_output"; then
+  fail "ambiguous MySQL error leaked the configured secret"
 fi
 
 set +e

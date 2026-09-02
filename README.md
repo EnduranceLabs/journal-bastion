@@ -249,6 +249,23 @@ MongoDB automatic mode is available in the Docker image, which contains the
 official server executable. npm CLI users can still use MongoDB through explicit
 configuration when `mongodb-mcp-server` is installed separately.
 
+#### Automatic MySQL integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MYSQL_CONNECTION_STRING` | alternative A | — | MySQL URL such as `mysql://readonly:password@db.internal:3306/analytics` |
+| `MYSQL_HOST` | alternative B | — | MySQL hostname or service name |
+| `MYSQL_PORT` | no | `3306` | MySQL port when using the separate connection fields |
+| `MYSQL_DATABASE` | alternative B | — | Database name |
+| `MYSQL_USER` | alternative B | — | Dedicated MySQL read-only username |
+| `MYSQL_PASSWORD` | alternative B | — | Password for the dedicated MySQL read-only user |
+
+Set either the connection URL or the separate fields, not both. The Docker image
+contains the pinned Google MCP Toolbox executable and exposes MySQL schema and
+SQL tools automatically. Use a database account with `SELECT` permission only;
+the Bastion integration is read-only by design and writes must be rejected by
+the database as a second safety boundary.
+
 #### Automatic Temporal Cloud integration
 
 | Variable | Required | Default | Description |
