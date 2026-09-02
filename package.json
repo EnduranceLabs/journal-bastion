@@ -1,6 +1,6 @@
 {
   "name": "@journal-labs/bastion",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Outbound bastion for connecting MCP servers and skills to Journal",
   "license": "MIT",
   "type": "module",
