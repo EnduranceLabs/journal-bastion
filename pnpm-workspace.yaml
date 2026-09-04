@@ -3,5 +3,5 @@ packages:
   - testing/integration/ts
 
 overrides:
-  fast-uri: 3.1.5
+  fast-uri: 3.1.7
   ip-address: 10.3.1
