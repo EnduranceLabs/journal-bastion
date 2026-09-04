@@ -15,6 +15,7 @@ RUN git clone --filter=blob:none https://github.com/temporalio/cli.git /src/temp
     git checkout "$TEMPORAL_CLI_COMMIT" && \
     test "$(git rev-parse HEAD)" = "$TEMPORAL_CLI_COMMIT" && \
     go get \
+      github.com/apache/thrift@v0.24.0 \
       github.com/labstack/echo/v4@v4.15.3 \
       golang.org/x/net@v0.58.0 \
       golang.org/x/text@v0.41.0 \
