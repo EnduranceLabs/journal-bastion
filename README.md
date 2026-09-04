@@ -58,6 +58,10 @@ POSTHOG_PROJECT_ID=12345
 # MongoDB official MCP server
 MDB_MCP_CONNECTION_STRING=mongodb+srv://readonly-user:...@cluster.example.net/app
 
+# Self-hosted Grafana MCP server
+GRAFANA_MCP_URL=https://mcp-grafana.example.com/mcp
+GRAFANA_MCP_TOKEN=...
+
 # Temporal Cloud (API key or PEM-encoded mTLS client certificate and key)
 # TEMPORAL_API_KEY=...
 TEMPORAL_TLS_CERT_DATA="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
@@ -75,6 +79,11 @@ with `mcp_read` and only the underlying product read permissions.
 PostHog uses its hosted MCP endpoint in project-pinned, read-only CLI mode. Use
 a personal API key created with PostHog's `MCP Server` preset; project ingestion
 keys beginning with `phc_` are rejected.
+
+Grafana points at an MCP server you run yourself, so the image adds no software
+for it and both the endpoint and its bearer token are required. Keep the
+deployment read-only from the Grafana side: `--disable-write` on the server and
+a `Viewer` service account.
 
 The image includes the official `mongodb-mcp-server` at version `2.1.0` and
 runs it locally over stdio. Automatic mode forces its read-only mode, disables
@@ -238,6 +247,26 @@ Run `journal-bastion --help` for the full list of flags and environment variable
 | `POSTHOG_FEATURES` | no | — | Comma-separated PostHog feature categories exposed through CLI mode |
 | `POSTHOG_TOOLS` | no | — | Comma-separated exact tool names, unioned with `POSTHOG_FEATURES` |
 | `POSTHOG_MCP_URL` | no | `https://mcp.posthog.com/mcp` | Advanced HTTPS endpoint override; `mode=cli` and `readonly=true` are enforced |
+
+#### Automatic Grafana integration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GRAFANA_MCP_URL` | yes | — | HTTPS endpoint of your own Grafana MCP server, including its path (`/mcp` for `streamable-http`) |
+| `GRAFANA_MCP_TOKEN` | yes | — | Bearer token the Grafana MCP server requires from callers (`--server-auth-token`), supplied without the `Bearer ` prefix |
+
+Grafana is the first integration whose server you host yourself, so unlike
+Datadog and PostHog there is no vendor endpoint to derive and both variables are
+required. The token authenticates the *bastion* to your MCP server; that server
+holds its own Grafana service account credentials, which never reach the bastion.
+
+Because the server is yours, read-only scope is yours to enforce and the bastion
+cannot impose it: run [`mcp-grafana`](https://grafana.com/docs/grafana/latest/developer-resources/mcp/)
+with `--disable-write` and give its Grafana service account the `Viewer` role.
+Narrow the catalog with `--enabled-tools`; the default set is large. Behind a
+reverse proxy, set `--allowed-hosts` to the hostname clients use, or the server
+rejects requests before the bastion is involved. Allow outbound HTTPS from the
+bastion container to that endpoint on port `443`.
 
 #### Automatic MongoDB integration
 

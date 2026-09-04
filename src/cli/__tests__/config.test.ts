@@ -123,7 +123,7 @@ describe("parseConfig", () => {
     });
     expect(config.automaticIntegrations).toEqual({
       enabled: ["datadog"],
-      disabled: ["posthog", "mongodb", "mysql", "temporal"],
+      disabled: ["posthog", "grafana", "mongodb", "mysql", "temporal"],
     });
   });
 
@@ -152,7 +152,7 @@ describe("parseConfig", () => {
     });
     expect(config.automaticIntegrations).toEqual({
       enabled: ["posthog", "mongodb"],
-      disabled: ["datadog", "mysql", "temporal"],
+      disabled: ["datadog", "grafana", "mysql", "temporal"],
     });
   });
 

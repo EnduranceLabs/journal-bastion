@@ -34,7 +34,14 @@ describe("resolveAutomaticIntegrations", () => {
       configFile: { mcpServers: [], skillsDir: null },
       derivedEnv: {},
       enabledIntegrationIds: [],
-      disabledIntegrationIds: ["datadog", "posthog", "mongodb", "mysql", "temporal"],
+      disabledIntegrationIds: [
+        "datadog",
+        "posthog",
+        "grafana",
+        "mongodb",
+        "mysql",
+        "temporal",
+      ],
     });
   });
 
@@ -206,6 +213,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.enabledIntegrationIds).toEqual(["posthog"]);
     expect(result.disabledIntegrationIds).toEqual([
       "datadog",
+      "grafana",
       "mongodb",
       "mysql",
       "temporal",
@@ -296,6 +304,82 @@ describe("resolveAutomaticIntegrations", () => {
     ).toEqual(expect.objectContaining({ url: expect.stringContaining("http:") }));
   });
 
+  it("builds a customer-hosted Grafana integration without exposing the token", () => {
+    const result = resolveAutomaticIntegrations({
+      GRAFANA_MCP_URL: "https://mcp-grafana.example.com/mcp",
+      GRAFANA_MCP_TOKEN: "caller-secret",
+    });
+
+    expect(result.enabledIntegrationIds).toEqual(["grafana"]);
+    expect(result.disabledIntegrationIds).toEqual([
+      "datadog",
+      "posthog",
+      "mongodb",
+      "mysql",
+      "temporal",
+    ]);
+    expect(result.configFile.mcpServers).toEqual([
+      expect.objectContaining({
+        id: "grafana",
+        name: "Grafana",
+        transport: "streamable-http",
+        url: "https://mcp-grafana.example.com/mcp",
+        headers: {
+          Authorization: "JOURNAL_BASTION_INTERNAL_GRAFANA_AUTHORIZATION",
+        },
+      }),
+    ]);
+    expect(result.derivedEnv).toEqual({
+      JOURNAL_BASTION_INTERNAL_GRAFANA_AUTHORIZATION: "Bearer caller-secret",
+    });
+    expect(result.configFile.skillsDir).toBeNull();
+    expect(JSON.stringify(result.configFile)).not.toContain("caller-secret");
+  });
+
+  it.each([
+    [{ GRAFANA_MCP_URL: "https://mcp-grafana.example.com/mcp" }, "GRAFANA_MCP_TOKEN"],
+    [{ GRAFANA_MCP_TOKEN: "caller-secret" }, "GRAFANA_MCP_URL"],
+  ])("rejects an incomplete Grafana integration (%o)", (env, missing) => {
+    expect(() => resolveAutomaticIntegrations(env)).toThrow(
+      `Incomplete Grafana integration: missing ${missing}`
+    );
+  });
+
+  it("rejects a Grafana token that still carries its Bearer prefix", () => {
+    expect(() =>
+      resolveAutomaticIntegrations({
+        GRAFANA_MCP_URL: "https://mcp-grafana.example.com/mcp",
+        GRAFANA_MCP_TOKEN: "Bearer caller-secret",
+      })
+    ).toThrow("without a Bearer prefix");
+  });
+
+  it("requires a credential-free HTTPS Grafana endpoint outside tests", () => {
+    const base = { GRAFANA_MCP_TOKEN: "caller-secret" };
+
+    expect(() =>
+      resolveAutomaticIntegrations({
+        ...base,
+        GRAFANA_MCP_URL: "http://127.0.0.1:8000/mcp",
+      })
+    ).toThrow("must use https");
+    expect(() =>
+      resolveAutomaticIntegrations({
+        ...base,
+        GRAFANA_MCP_URL: "https://user:secret@mcp-grafana.example.com/mcp",
+      })
+    ).toThrow("must not contain credentials");
+    expect(() =>
+      resolveAutomaticIntegrations({ ...base, GRAFANA_MCP_URL: "not-a-url" })
+    ).toThrow("must be a valid URL");
+    expect(
+      resolveAutomaticIntegrations(
+        { ...base, GRAFANA_MCP_URL: "http://127.0.0.1:8000/mcp" },
+        { allowInsecureUrls: true }
+      ).configFile.mcpServers[0]
+    ).toEqual(expect.objectContaining({ url: expect.stringContaining("http:") }));
+  });
+
   it("builds a scope-pinned MongoDB stdio integration", () => {
     const connectionString =
       "mongodb://readonly:secret@mongo.internal:27017/spendflo";
@@ -307,6 +391,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.disabledIntegrationIds).toEqual([
       "datadog",
       "posthog",
+      "grafana",
       "mysql",
       "temporal",
     ]);
@@ -357,6 +442,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.disabledIntegrationIds).toEqual([
       "datadog",
       "posthog",
+      "grafana",
       "mongodb",
       "temporal",
     ]);
@@ -493,6 +579,7 @@ describe("resolveAutomaticIntegrations", () => {
       "dd-api-secret",
       "dd-app-secret",
       "phx_secret",
+      "grafana-caller-secret",
       "mongo-secret",
       "mysql-secret",
       "temporal-secret",
@@ -502,9 +589,11 @@ describe("resolveAutomaticIntegrations", () => {
       DATADOG_APP_KEY: secrets[1],
       POSTHOG_PERSONAL_API_KEY: secrets[2],
       POSTHOG_PROJECT_ID: "12345",
-      MDB_MCP_CONNECTION_STRING: `mongodb://readonly:${secrets[3]}@mongo:27017/db`,
-      MYSQL_CONNECTION_STRING: `mysql://readonly:${secrets[4]}@mysql/analytics`,
-      TEMPORAL_API_KEY: secrets[5],
+      GRAFANA_MCP_URL: "https://mcp-grafana.example.com/mcp",
+      GRAFANA_MCP_TOKEN: secrets[3],
+      MDB_MCP_CONNECTION_STRING: `mongodb://readonly:${secrets[4]}@mongo:27017/db`,
+      MYSQL_CONNECTION_STRING: `mysql://readonly:${secrets[5]}@mysql/analytics`,
+      TEMPORAL_API_KEY: secrets[6],
       TEMPORAL_NAMESPACE: "journal-test.a1b2c",
       TEMPORAL_ADDRESS: "journal-test.a1b2c.tmprl.cloud:7233",
     });
@@ -512,6 +601,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.enabledIntegrationIds).toEqual([
       "datadog",
       "posthog",
+      "grafana",
       "mongodb",
       "mysql",
       "temporal",
@@ -520,6 +610,7 @@ describe("resolveAutomaticIntegrations", () => {
     expect(result.configFile.mcpServers.map((server) => server.id)).toEqual([
       "datadog",
       "posthog",
+      "grafana",
       "mongodb",
       "mysql",
       "temporal",
