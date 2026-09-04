@@ -345,6 +345,64 @@ describe("resolveAutomaticIntegrations", () => {
     );
   });
 
+  it.each([
+    ["http://host/sse", "sse"],
+    ["https://mcp-grafana.example.com/sse", "sse"],
+    ["https://mcp-grafana.example.com/sse/", "sse"],
+    ["https://mcp-grafana.example.com/mcp", "streamable-http"],
+    ["https://mcp-grafana.example.com/", "streamable-http"],
+    ["https://mcp-grafana.example.com/sse-proxy", "streamable-http"],
+  ])("infers the Grafana transport from %s", (url, transport) => {
+    const result = resolveAutomaticIntegrations(
+      { GRAFANA_MCP_URL: url, GRAFANA_MCP_TOKEN: "caller-secret" },
+      { allowInsecureUrls: true }
+    );
+
+    expect(result.configFile.mcpServers[0]).toEqual(
+      expect.objectContaining({ id: "grafana", transport })
+    );
+  });
+
+  it("lets GRAFANA_MCP_TRANSPORT override the inferred transport", () => {
+    const base = { GRAFANA_MCP_TOKEN: "caller-secret" };
+
+    // An SSE server on a non-standard path.
+    expect(
+      resolveAutomaticIntegrations({
+        ...base,
+        GRAFANA_MCP_URL: "https://mcp-grafana.example.com/events",
+        GRAFANA_MCP_TRANSPORT: "sse",
+      }).configFile.mcpServers[0]
+    ).toEqual(expect.objectContaining({ transport: "sse" }));
+
+    // ...and streamable-http served from /sse, against the inference.
+    expect(
+      resolveAutomaticIntegrations({
+        ...base,
+        GRAFANA_MCP_URL: "https://mcp-grafana.example.com/sse",
+        GRAFANA_MCP_TRANSPORT: "STREAMABLE-HTTP",
+      }).configFile.mcpServers[0]
+    ).toEqual(expect.objectContaining({ transport: "streamable-http" }));
+  });
+
+  it("rejects an unknown GRAFANA_MCP_TRANSPORT", () => {
+    expect(() =>
+      resolveAutomaticIntegrations({
+        GRAFANA_MCP_URL: "https://mcp-grafana.example.com/mcp",
+        GRAFANA_MCP_TOKEN: "caller-secret",
+        GRAFANA_MCP_TRANSPORT: "websocket",
+      })
+    ).toThrow("GRAFANA_MCP_TRANSPORT must be sse or streamable-http");
+  });
+
+  it("treats GRAFANA_MCP_TRANSPORT alone as an incomplete integration", () => {
+    expect(() =>
+      resolveAutomaticIntegrations({ GRAFANA_MCP_TRANSPORT: "sse" })
+    ).toThrow(
+      "Incomplete Grafana integration: missing GRAFANA_MCP_URL, GRAFANA_MCP_TOKEN"
+    );
+  });
+
   it("rejects a Grafana token that still carries its Bearer prefix", () => {
     expect(() =>
       resolveAutomaticIntegrations({

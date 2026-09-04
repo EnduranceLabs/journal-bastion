@@ -29,7 +29,11 @@ const POSTHOG_ENV_NAMES = [
 
 // Grafana is the first integration whose endpoint is customer-hosted: there is
 // no vendor endpoint to derive, so the URL is required rather than defaulted.
-const GRAFANA_ENV_NAMES = ["GRAFANA_MCP_URL", "GRAFANA_MCP_TOKEN"] as const;
+const GRAFANA_ENV_NAMES = [
+  "GRAFANA_MCP_URL",
+  "GRAFANA_MCP_TOKEN",
+  "GRAFANA_MCP_TRANSPORT",
+] as const;
 
 const MONGODB_ENV_NAMES = ["MDB_MCP_CONNECTION_STRING"] as const;
 
@@ -391,6 +395,46 @@ function resolveGrafanaUrl(
 }
 
 /**
+ * Pick the MCP transport for a customer-hosted Grafana endpoint.
+ *
+ * `mcp-grafana` serves exactly one of two shapes and nothing on the other's
+ * path: `--transport sse` answers on `/sse`, `--transport streamable-http` on
+ * `--endpoint-path` (default `/mcp`). Guessing wrong is a confusing failure —
+ * a streamable-http client POSTing to an SSE endpoint gets only
+ * "Method not allowed" on a retry loop, which reads like a broken server
+ * rather than a transport mismatch.
+ *
+ * So infer `sse` from the conventional `/sse` path, which is what an operator
+ * following Grafana's own docs will have, and let `GRAFANA_MCP_TRANSPORT`
+ * override for a non-standard path. Streamable HTTP stays the default because
+ * it is the current MCP recommendation and SSE is legacy.
+ */
+function resolveGrafanaTransport(
+  env: Record<string, string | undefined>,
+  endpoint: string
+): "sse" | "streamable-http" {
+  const explicit = value(env, "GRAFANA_MCP_TRANSPORT")?.toLowerCase();
+  if (explicit !== undefined) {
+    if (explicit !== "sse" && explicit !== "streamable-http") {
+      throw new Error(
+        "GRAFANA_MCP_TRANSPORT must be sse or streamable-http"
+      );
+    }
+    return explicit;
+  }
+
+  let path: string;
+  try {
+    path = new URL(endpoint).pathname;
+  } catch {
+    // An unparseable URL is reported by resolveGrafanaUrl, which runs next and
+    // gives the clearer message. Don't pre-empt it with a transport error.
+    return "streamable-http";
+  }
+  return path.replace(/\/+$/, "").endsWith("/sse") ? "sse" : "streamable-http";
+}
+
+/**
  * The Grafana MCP server is run by the customer, not by Grafana, so the URL and
  * the bearer token are both required — there is no endpoint to derive from a
  * region and no credential we can infer. The token authenticates the *caller*
@@ -437,7 +481,7 @@ function resolveGrafanaIntegration(
       name: "Grafana",
       description:
         "Grafana dashboards, datasources, Prometheus and Loki queries, alerting, and incident context from the customer-hosted Grafana MCP server",
-      transport: "streamable-http",
+      transport: resolveGrafanaTransport(env, endpoint as string),
       url: resolveGrafanaUrl(endpoint as string, allowInsecureUrls),
       headers: {
         Authorization: INTERNAL_GRAFANA_AUTHORIZATION,
