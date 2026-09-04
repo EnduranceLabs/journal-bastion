@@ -27,6 +27,10 @@ const POSTHOG_ENV_NAMES = [
   "POSTHOG_MCP_URL",
 ] as const;
 
+// Grafana is the first integration whose endpoint is customer-hosted: there is
+// no vendor endpoint to derive, so the URL is required rather than defaulted.
+const GRAFANA_ENV_NAMES = ["GRAFANA_MCP_URL", "GRAFANA_MCP_TOKEN"] as const;
+
 const MONGODB_ENV_NAMES = ["MDB_MCP_CONNECTION_STRING"] as const;
 
 const MYSQL_ENV_NAMES = [
@@ -67,6 +71,8 @@ const INTERNAL_DATADOG_APP_KEY = "JOURNAL_BASTION_INTERNAL_DATADOG_APP_KEY";
 const DEFAULT_POSTHOG_MCP_URL = "https://mcp.posthog.com/mcp";
 const INTERNAL_POSTHOG_AUTHORIZATION =
   "JOURNAL_BASTION_INTERNAL_POSTHOG_AUTHORIZATION";
+const INTERNAL_GRAFANA_AUTHORIZATION =
+  "JOURNAL_BASTION_INTERNAL_GRAFANA_AUTHORIZATION";
 const DEFAULT_MYSQL_PORT = "3306";
 
 export interface AutomaticIntegrationsResult {
@@ -360,6 +366,89 @@ function resolvePosthogIntegration(
   };
 }
 
+function resolveGrafanaUrl(
+  endpoint: string,
+  allowInsecureUrls: boolean
+): string {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new Error("GRAFANA_MCP_URL must be a valid URL");
+  }
+
+  if (url.username || url.password) {
+    throw new Error("GRAFANA_MCP_URL must not contain credentials");
+  }
+  if (url.protocol !== "https:" && !allowInsecureUrls) {
+    throw new Error("GRAFANA_MCP_URL must use https");
+  }
+  if (!(url.protocol === "https:" || url.protocol === "http:")) {
+    throw new Error("GRAFANA_MCP_URL must use http or https");
+  }
+
+  return url.toString();
+}
+
+/**
+ * The Grafana MCP server is run by the customer, not by Grafana, so the URL and
+ * the bearer token are both required — there is no endpoint to derive from a
+ * region and no credential we can infer. The token authenticates the *caller*
+ * to that server (its `--server-auth-token`); the server holds its own Grafana
+ * credentials, which never reach the bastion.
+ *
+ * Read-only scope is therefore the customer's to enforce, through the server's
+ * `--disable-write` flag and the Grafana service account's role. The bastion
+ * cannot impose it the way it does for Datadog or PostHog.
+ */
+function resolveGrafanaIntegration(
+  env: Record<string, string | undefined>,
+  allowInsecureUrls: boolean
+): {
+  server: BastionConfigFile["mcpServers"][number];
+  derivedEnv: Record<string, string>;
+} | null {
+  if (!hasIntent(env, GRAFANA_ENV_NAMES)) return null;
+
+  const endpoint = value(env, "GRAFANA_MCP_URL");
+  const token = value(env, "GRAFANA_MCP_TOKEN");
+  const missing: string[] = [];
+  if (!endpoint) missing.push("GRAFANA_MCP_URL");
+  if (!token) missing.push("GRAFANA_MCP_TOKEN");
+  if (missing.length > 0) {
+    throw new Error(
+      `Incomplete Grafana integration: missing ${missing.join(", ")}`
+    );
+  }
+
+  const resolvedToken = token as string;
+  // A token pasted straight out of a curl example arrives with the scheme
+  // still attached, which would produce "Bearer Bearer <token>" and a 401 that
+  // looks like a bad credential rather than a formatting mistake.
+  if (/^bearer\s/i.test(resolvedToken)) {
+    throw new Error(
+      "GRAFANA_MCP_TOKEN must be the token only, without a Bearer prefix"
+    );
+  }
+
+  return {
+    server: {
+      id: "grafana",
+      name: "Grafana",
+      description:
+        "Grafana dashboards, datasources, Prometheus and Loki queries, alerting, and incident context from the customer-hosted Grafana MCP server",
+      transport: "streamable-http",
+      url: resolveGrafanaUrl(endpoint as string, allowInsecureUrls),
+      headers: {
+        Authorization: INTERNAL_GRAFANA_AUTHORIZATION,
+      },
+    },
+    derivedEnv: {
+      [INTERNAL_GRAFANA_AUTHORIZATION]: `Bearer ${resolvedToken}`,
+    },
+  };
+}
+
 function resolveMongodbIntegration(
   env: Record<string, string | undefined>
 ): {
@@ -570,6 +659,7 @@ export function resolveAutomaticIntegrations(
   const resolved = [
     ["datadog", resolveDatadogIntegration(env, allowInsecureUrls)],
     ["posthog", resolvePosthogIntegration(env, allowInsecureUrls)],
+    ["grafana", resolveGrafanaIntegration(env, allowInsecureUrls)],
     ["mongodb", resolveMongodbIntegration(env)],
     ["mysql", resolveMysqlIntegration(env)],
     ["temporal", resolveTemporalIntegration(env)],
