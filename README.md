@@ -254,10 +254,20 @@ Run `journal-bastion --help` for the full list of flags and environment variable
 |----------|----------|---------|-------------|
 | `GRAFANA_MCP_URL` | yes | — | HTTPS endpoint of your own Grafana MCP server, including its path (`/mcp` for `streamable-http`) |
 | `GRAFANA_MCP_TOKEN` | yes | — | Bearer token the Grafana MCP server requires from callers (`--server-auth-token`), supplied without the `Bearer ` prefix |
+| `GRAFANA_MCP_TRANSPORT` | no | inferred from the URL path | `sse` or `streamable-http`. Only needed when the server uses a non-standard path |
 
 Grafana is the first integration whose server you host yourself, so unlike
 Datadog and PostHog there is no vendor endpoint to derive and both variables are
-required. The token authenticates the *bastion* to your MCP server; that server
+required.
+
+`mcp-grafana` serves exactly one transport and nothing on the other's path:
+`--transport sse` answers on `/sse`, `--transport streamable-http` on
+`--endpoint-path` (default `/mcp`). The transport is inferred from the URL — a
+path ending in `/sse` selects `sse`, anything else `streamable-http` — so the
+conventional endpoints need no extra configuration. Set
+`GRAFANA_MCP_TRANSPORT` only for a non-standard path. Getting it wrong fails as
+a retry loop logging `Method not allowed`, which looks like a broken server
+rather than a transport mismatch. The token authenticates the *bastion* to your MCP server; that server
 holds its own Grafana service account credentials, which never reach the bastion.
 
 Because the server is yours, read-only scope is yours to enforce and the bastion
