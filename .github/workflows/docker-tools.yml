@@ -1,0 +1,260 @@
+name: Publish Bastion Go tools image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Immutable tools image version (for example, 1.0.0)
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: container-tools-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/endurancelabs/journal-bastion-tools
+
+jobs:
+  validate:
+    name: Validate tools release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tools version must be <major>.<minor>.<patch>: $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR for immutable-tag check
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reject an existing immutable tools tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if docker manifest inspect "$IMAGE:v$VERSION" >/dev/null 2>&1; then
+            echo "$IMAGE:v$VERSION already exists and will not be overwritten" >&2
+            exit 1
+          fi
+
+  build:
+    name: Build tools (${{ matrix.platform }})
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push native tools image by digest
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packaging/docker/tools.Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            TOOLS_IMAGE_VERSION=${{ inputs.version }}
+            VCS_REF=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.licenses=MIT
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=container-tools-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=container-tools-${{ matrix.arch }}
+
+      - name: Save image digest
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload image digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tools-digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: Publish multi-platform tools manifest
+    needs: build
+    runs-on: ubuntu-24.04
+    outputs:
+      reference: ${{ steps.reference.outputs.reference }}
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Download native digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: tools-digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create tools manifest
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f | sort)
+          if [ "${#digest_files[@]}" -ne 2 ]; then
+            echo "Expected two architecture digests, found ${#digest_files[@]}" >&2
+            exit 1
+          fi
+
+          refs=()
+          for digest_file in "${digest_files[@]}"; do
+            refs+=("$IMAGE@sha256:$(basename "$digest_file")")
+          done
+
+          docker buildx imagetools create \
+            --tag "$IMAGE:v$VERSION" \
+            --tag "$IMAGE:sha-${GITHUB_SHA::12}" \
+            "${refs[@]}"
+
+      - name: Record tools image digest
+        id: reference
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect "$IMAGE:v$VERSION" --format '{{.Manifest.Digest}}')"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Unexpected manifest digest: $digest" >&2
+            exit 1
+          fi
+          reference="$IMAGE@$digest"
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+          echo "$reference" | tee tools-image-reference.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload tools image reference
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tools-image-reference
+          path: tools-image-reference.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  verify:
+    name: Verify tools in Bastion (${{ matrix.platform }})
+    needs: manifest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Bastion with the exact tools digest
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packaging/docker/Dockerfile.prebuilt
+          load: true
+          platforms: ${{ matrix.platform }}
+          tags: journal-bastion:tools-${{ matrix.arch }}
+          build-args: |
+            TOOLS_IMAGE=${{ needs.manifest.outputs.reference }}
+
+      - name: Scan tools image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ needs.manifest.outputs.reference }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          hide-progress: true
+
+      - name: Run Docker contract
+        env:
+          BUILD_IMAGE: "0"
+          IMAGE: journal-bastion:tools-${{ matrix.arch }}
+        run: testing/docker/run-contract.sh

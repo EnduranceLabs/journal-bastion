@@ -73,3 +73,24 @@ packaging/docker/publish.sh
 The GHCR package is public. The workflow verifies anonymous pulls of each native
 digest before creating release tags, then verifies the final multi-platform tag
 before creating the GitHub release.
+
+### Prebuilt Go tools
+
+The release can optionally copy `temporal`, `tcld`, and `toolbox` from the
+separate `journal-bastion-tools` image. This keeps the normal release from
+recompiling those tools and avoids uploading their build cache.
+
+The fallback is intentional. Until the tools image has been published and
+verified, leave the repository variable `BASTION_TOOLS_IMAGE` unset; releases
+continue using the existing Dockerfile. To enable the faster path, run the
+manual `Publish Bastion Go tools image` workflow, verify its final contract
+image, and set `BASTION_TOOLS_IMAGE` to the exact reference printed by that
+workflow, for example:
+
+```text
+ghcr.io/endurancelabs/journal-bastion-tools@sha256:<64-hex-digit-digest>
+```
+
+The variable is not a secret. It must be updated whenever the tools image is
+deliberately rebuilt. Removing it immediately rolls releases back to the
+legacy build path.

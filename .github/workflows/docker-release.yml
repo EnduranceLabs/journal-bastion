@@ -155,17 +155,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Select Dockerfile
+        id: dockerfile
+        env:
+          TOOLS_IMAGE: ${{ vars.BASTION_TOOLS_IMAGE }}
+        run: |
+          if [ -n "$TOOLS_IMAGE" ]; then
+            if [[ ! "$TOOLS_IMAGE" =~ ^ghcr\.io/endurancelabs/journal-bastion-tools@sha256:[0-9a-f]{64}$ ]]; then
+              echo "BASTION_TOOLS_IMAGE must be a full journal-bastion-tools digest reference" >&2
+              exit 1
+            fi
+            echo "path=packaging/docker/Dockerfile.prebuilt" >> "$GITHUB_OUTPUT"
+            echo "Using pinned prebuilt Go tools image: $TOOLS_IMAGE"
+          else
+            echo "path=packaging/docker/Dockerfile" >> "$GITHUB_OUTPUT"
+            echo "BASTION_TOOLS_IMAGE is not set; using the legacy in-image Go build"
+          fi
+
       - name: Build and push native image by digest
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: packaging/docker/Dockerfile
+          file: ${{ steps.dockerfile.outputs.path }}
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             IMAGE_VERSION=${{ needs.validate.outputs.version }}
             VCS_REF=${{ github.sha }}
+            TOOLS_IMAGE=${{ vars.BASTION_TOOLS_IMAGE }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
