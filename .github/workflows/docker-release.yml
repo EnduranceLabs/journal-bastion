@@ -385,7 +385,7 @@ jobs:
           set -euo pipefail
           if [ "$MODE" = "legacy" ]; then
             echo "target=runner-legacy" >> "$GITHUB_OUTPUT"
-            echo "reference=" >> "$GITHUB_OUTPUT"
+            echo "reference=scratch" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
