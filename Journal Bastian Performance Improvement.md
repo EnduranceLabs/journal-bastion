@@ -328,6 +328,27 @@ Implementation notes:
   assertion (`connect` not disabled), so the new tools image still requires the
   GitHub amd64/arm64 contract run before activation.
 
+### How we will detect tool updates
+
+PR 1 does not automatically detect upstream releases. It records a deliberate
+snapshot of the Temporal CLI, tcld, and MCP Toolbox source commits and versions.
+
+Recommended follow-up:
+
+- Run a scheduled weekly or monthly checker on the default branch.
+- Compare the pinned commits and versions in `packaging/docker/tools.Dockerfile`
+  with the latest upstream releases/tags.
+- Open an issue or pull request when an update is found; do not silently rebuild
+  the active tools digest.
+- Treat Trivy/security advisories as an emergency update trigger, even if there
+  is no normal version release.
+- After review, publish a new tools-image version, run both architecture
+  contracts, and update `BASTION_TOOLS_IMAGE` to the new digest.
+
+Dependabot can help with the Go base image, Go modules, and GitHub Actions, but
+these tools are currently pinned through custom Git commit arguments, so a small
+purpose-built checker will be needed for reliable upstream release detection.
+
 ### Phase 2 — Depot canary
 
 - [ ] Create/connect the Depot project.
