@@ -17,16 +17,18 @@ Do not remove a safety check just to improve the clock time.
 
 ## Current status
 
-PR 1 is being updated to automate tools-image discovery. The prebuilt path is
-the default for releases, with an explicit kill switch for the legacy build.
+PR 1 is merged and the prebuilt path is the default for releases, with an
+explicit kill switch for the legacy build. PR 2 is adding an opt-in Depot
+canary while preserving the existing per-architecture release verification.
 `BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
 
 Repository: `EnduranceLabs/journal-bastion`
 
 Workflow: [docker-release.yml](https://github.com/EnduranceLabs/journal-bastion/actions/workflows/docker-release.yml)
 
-The local checkout is the PR branch `perf/prebuilt-go-tools`. The automation
-changes are committed and pushed in [PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58).
+PR 1 was developed on `perf/prebuilt-go-tools` and its automation changes are
+merged in [PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58).
+The current PR 2 checkout is `perf/depot-canary`.
 
 ## Problem in simple English
 
@@ -318,15 +320,16 @@ Implementation notes:
 - `BASTION_TOOLS_IMAGE` is an optional exact-digest override. The repository
   variable `BASTION_DISABLE_PREBUILT_TOOLS=true` is the explicit kill switch for
   the legacy path.
-- `docker-ci.yml` and `packaging/docker/publish.sh` support both Dockerfile
-  targets; normal CI/local builds remain on the legacy target unless an exact
-  override is supplied.
-- The tools image has not been published yet, so the faster path is not active.
-- Latest PR validation is not mergeable yet: both GitHub Docker contract jobs
-  failed before the build because CI selected `runner-legacy` with no tools
-  image configured, but still passed an empty `TOOLS_IMAGE` build argument.
-  The Dockerfile rejects that empty external stage. This needs a workflow fix
-  and a new CI run before merge.
+- `docker-ci.yml` uses Depot when `DEPOT_PROJECT_ID` is set and otherwise
+  supports the existing Buildx path. `packaging/docker/publish.sh` remains on
+  the legacy target unless an exact tools-image override is supplied.
+- The tools image has not been published yet, so the prebuilt-tools path is
+  not active.
+- Post-merge Container CI run
+  [#33979773300](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33979773300)
+  passed source checks and both native Docker contract jobs. That run used the
+  legacy path because the Depot repository variable had not yet been added; the
+  new Depot path is exercised by the PR Docker contract matrix.
 - Local Docker validation is currently blocked because the Docker daemon socket
   was initially unavailable, but Colima BuildKit checks now pass. A real local
   amd64 build reached the unchanged tcld command and hit a Go 1.26.6 runtime
@@ -358,15 +361,31 @@ Implementation notes:
 
 ### Phase 2 — Depot canary
 
-- [ ] Create/connect the Depot project.
-- [ ] Configure GitHub OIDC trust for this repository/workflow, if approved.
-- [ ] Add the project ID as a repository variable or equivalent non-secret configuration.
-- [ ] Keep GHCR login and package permissions for the push path.
-- [ ] Replace only the canary build action first.
+- [x] Create/connect the Depot project.
+- [x] Configure GitHub OIDC trust for this repository/workflow, if approved.
+- [x] Add the project ID as a repository variable or equivalent non-secret configuration.
+- [x] Keep GHCR login and package permissions for the push path.
+- [x] Add an opt-in Depot build path while preserving the Buildx path.
+- [x] Preserve the per-architecture digest output and existing verification flow.
+- [x] Replace only the canary build action first.
 - [ ] Test the current per-architecture digest output, Trivy scan, manifest creation, and attestations.
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
 - [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
 - [ ] Decide whether to keep GHA cache export, change its mode, or remove it after measuring.
+
+Implementation notes:
+
+- The release image and Docker contract jobs select
+  `depot/build-push-action` only when `DEPOT_PROJECT_ID` is set; otherwise they
+  use the existing Docker Buildx action.
+- The existing PR Docker contract matrix is the safe canary: it builds and
+  loads `journal-bastion:ci-*` locally and does not publish a release tag.
+- The Depot path keeps the existing native-architecture matrix, digest output,
+  SBOM/provenance, Trivy scan, manifest, attestation, and public-contract jobs.
+- Depot's persistent builder cache is used for the Depot path; the existing GHA
+  cache export remains on the Buildx path for comparison.
+- `buildx-fallback` is explicitly disabled for the initial canary so Depot
+  authentication or build failures remain visible.
 
 ### Phase 3 — production rollout
 
@@ -387,7 +406,8 @@ Implementation notes:
 
 Files changed for PR 1 are the unified Dockerfile, the release/CI workflow
 changes, the local publish helper, the release runbook, and this continuity
-plan. pnpm and Depot are unchanged.
+plan. pnpm is unchanged; the Depot canary now changes both Docker workflows
+and the release documentation.
 
 ## Open questions
 

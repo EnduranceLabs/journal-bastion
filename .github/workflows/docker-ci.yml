@@ -76,13 +76,20 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+      id-token: write
       packages: read
+    env:
+      DEPOT_PROJECT_ID: ${{ vars.DEPOT_PROJECT_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Set up Depot
+        if: env.DEPOT_PROJECT_ID != ''
+        uses: depot/setup-action@91bc8495a33ebfc504ffc89e5674379ccf23c29c # v1.7.2
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -111,7 +118,23 @@ jobs:
             echo "Using pinned prebuilt Go tools image: $TOOLS_IMAGE"
           fi
 
-      - name: Build native image
+      - name: Build native image with Depot
+        if: env.DEPOT_PROJECT_ID != ''
+        uses: depot/build-push-action@98e78adca7817480b8185f474a400b451d74e287 # v1.18.0
+        with:
+          project: ${{ env.DEPOT_PROJECT_ID }}
+          context: .
+          file: packaging/docker/Dockerfile
+          target: ${{ steps.image.outputs.target }}
+          load: true
+          platforms: ${{ matrix.platform }}
+          tags: journal-bastion:ci-${{ matrix.arch }}
+          build-args: |
+            TOOLS_IMAGE=${{ steps.image.outputs.tools_image }}
+          buildx-fallback: false
+
+      - name: Build native image with Buildx
+        if: env.DEPOT_PROJECT_ID == ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
