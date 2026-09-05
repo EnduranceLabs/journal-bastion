@@ -468,4 +468,4 @@ and the release documentation.
 
 ## How to continue in a new session
 
-Start with: “Read `Journal Bastian Performance Improvement.md`, inspect the current git status, and continue from the first unchecked item. Do not implement anything unless I ask for implementation.”
+Start with: “Read `Journal_Bastian_Performance_Improvement.md`, inspect the current git status, and continue from the first unchecked item. Do not implement anything unless I ask for implementation.”
