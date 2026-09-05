@@ -73,3 +73,30 @@ packaging/docker/publish.sh
 The GHCR package is public. The workflow verifies anonymous pulls of each native
 digest before creating release tags, then verifies the final multi-platform tag
 before creating the GitHub release.
+
+### Prebuilt Go tools
+
+The release workflow can copy `temporal`, `tcld`, and `toolbox` from the
+separate `journal-bastion-tools` image. It fingerprints the tools definition,
+reuses the matching immutable GHCR image when it exists, and builds, scans, and
+publishes it automatically when it does not. Normal releases therefore do not
+recompile those tools.
+
+`BASTION_TOOLS_IMAGE` is optional. If set, it overrides automatic detection and
+must contain a full immutable digest reference, for example:
+
+```text
+ghcr.io/endurancelabs/journal-bastion-tools@sha256:<64-hex-digit-digest>
+```
+
+The variable is not a secret and normally does not need to be set or updated.
+Set `BASTION_DISABLE_PREBUILT_TOOLS=true` as the kill switch; this forces the
+known legacy in-release Go build. If automatic tools-image creation fails, the
+release stops clearly so the kill switch can be enabled deliberately rather
+than silently publishing an unverified tools image.
+
+To update a tool, change its pinned version and commit in
+`packaging/docker/Dockerfile`, merge the change, and create the normal Bastion
+release tag. The release workflow creates and verifies the new tools image as
+part of that run. The first release after a tools change is slower; later
+releases reuse the published image.
