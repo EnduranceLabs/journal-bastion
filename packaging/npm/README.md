@@ -76,21 +76,27 @@ before creating the GitHub release.
 
 ### Prebuilt Go tools
 
-The release can optionally copy `temporal`, `tcld`, and `toolbox` from the
-separate `journal-bastion-tools` image. This keeps the normal release from
-recompiling those tools and avoids uploading their build cache.
+The release workflow can copy `temporal`, `tcld`, and `toolbox` from the
+separate `journal-bastion-tools` image. It fingerprints the tools definition,
+reuses the matching immutable GHCR image when it exists, and builds, scans, and
+publishes it automatically when it does not. Normal releases therefore do not
+recompile those tools.
 
-The fallback is intentional. Until the tools image has been published and
-verified, leave the repository variable `BASTION_TOOLS_IMAGE` unset; releases
-continue using the existing Dockerfile. To enable the faster path, run the
-manual `Publish Bastion Go tools image` workflow, verify its final contract
-image, and set `BASTION_TOOLS_IMAGE` to the exact reference printed by that
-workflow, for example:
+`BASTION_TOOLS_IMAGE` is optional. If set, it overrides automatic detection and
+must contain a full immutable digest reference, for example:
 
 ```text
 ghcr.io/endurancelabs/journal-bastion-tools@sha256:<64-hex-digit-digest>
 ```
 
-The variable is not a secret. It must be updated whenever the tools image is
-deliberately rebuilt. Removing it immediately rolls releases back to the
-legacy build path.
+The variable is not a secret and normally does not need to be set or updated.
+Set `BASTION_DISABLE_PREBUILT_TOOLS=true` as the kill switch; this forces the
+known legacy in-release Go build. If automatic tools-image creation fails, the
+release stops clearly so the kill switch can be enabled deliberately rather
+than silently publishing an unverified tools image.
+
+To update a tool, change its pinned version and commit in
+`packaging/docker/Dockerfile`, merge the change, and create the normal Bastion
+release tag. The release workflow creates and verifies the new tools image as
+part of that run. The first release after a tools change is slower; later
+releases reuse the published image.

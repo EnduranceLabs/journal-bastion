@@ -92,27 +92,29 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Select Dockerfile
-        id: dockerfile
+        id: image
         env:
+          DISABLE_PREBUILT: ${{ vars.BASTION_DISABLE_PREBUILT_TOOLS }}
           TOOLS_IMAGE: ${{ vars.BASTION_TOOLS_IMAGE }}
         run: |
-          if [ -n "$TOOLS_IMAGE" ]; then
+          if [ "$DISABLE_PREBUILT" = "true" ] || [ -z "$TOOLS_IMAGE" ]; then
+            echo "target=runner-legacy" >> "$GITHUB_OUTPUT"
+            echo "BASTION_DISABLE_PREBUILT_TOOLS is enabled or BASTION_TOOLS_IMAGE is unset; using the legacy in-image Go build"
+          else
             if [[ ! "$TOOLS_IMAGE" =~ ^ghcr\.io/endurancelabs/journal-bastion-tools@sha256:[0-9a-f]{64}$ ]]; then
               echo "BASTION_TOOLS_IMAGE must be a full journal-bastion-tools digest reference" >&2
               exit 1
             fi
-            echo "path=packaging/docker/Dockerfile.prebuilt" >> "$GITHUB_OUTPUT"
+            echo "target=runner-prebuilt" >> "$GITHUB_OUTPUT"
             echo "Using pinned prebuilt Go tools image: $TOOLS_IMAGE"
-          else
-            echo "path=packaging/docker/Dockerfile" >> "$GITHUB_OUTPUT"
-            echo "BASTION_TOOLS_IMAGE is not set; using the legacy in-image Go build"
           fi
 
       - name: Build native image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: ${{ steps.dockerfile.outputs.path }}
+          file: packaging/docker/Dockerfile
+          target: ${{ steps.image.outputs.target }}
           load: true
           platforms: ${{ matrix.platform }}
           tags: journal-bastion:ci-${{ matrix.arch }}

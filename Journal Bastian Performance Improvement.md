@@ -17,15 +17,16 @@ Do not remove a safety check just to improve the clock time.
 
 ## Current status
 
-PR 1 code is implemented locally; the GitHub canary is pending. The code path is intentionally opt-in:
-without `BASTION_TOOLS_IMAGE`, releases use the existing Dockerfile unchanged.
+PR 1 is being updated to automate tools-image discovery. The prebuilt path is
+the default for releases, with an explicit kill switch for the legacy build.
+`BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
 
 Repository: `EnduranceLabs/journal-bastion`
 
 Workflow: [docker-release.yml](https://github.com/EnduranceLabs/journal-bastion/actions/workflows/docker-release.yml)
 
-The local checkout is `main` at commit `bf7f2cd` with the implementation changes
-and this plan file not yet committed or pushed.
+The local checkout is the PR branch `perf/prebuilt-go-tools`; these follow-up
+changes are not yet committed or pushed.
 
 ## Problem in simple English
 
@@ -231,7 +232,10 @@ Before publishing the tools image, confirm:
 - update policy for upstream commits, Go, dependencies, and security fixes
 - whether the image is one multi-platform image or two architecture-specific images
 
-PR 1 must fail closed if the tools image is missing, has the wrong digest, or has the wrong architecture. It must not silently compile a different binary or use a movable tag.
+PR 1 must build and verify a missing tools image, and must fail closed if the
+tools image has the wrong digest or architecture. It must not silently use a
+movable tag or an unverified artifact. The legacy path remains available only
+through the explicit kill switch.
 
 Required validation before enabling the new Dockerfile in a real release:
 
@@ -298,56 +302,54 @@ Work one small, measurable item at a time. Update this file after every item.
 - [x] Add a main-image path that consumes an exact tools image digest.
 - [ ] Verify binary versions and the Docker contract on amd64 and arm64.
 - [x] Add a deliberate tool-update path and document rollback.
+- [x] Automatically detect, reuse, or publish the tools image during a normal release.
+- [x] Add an explicit kill switch for the legacy build path.
 - [ ] Measure cold and warm release builds.
 
 Implementation notes:
 
-- `packaging/docker/tools.Dockerfile` contains the same pinned Go builds as the
-  current release Dockerfile and publishes a scratch, multi-platform tools image.
-- `packaging/docker/Dockerfile.prebuilt` copies those binaries from the exact
-  digest supplied through `BASTION_TOOLS_IMAGE`.
-- `.github/workflows/docker-tools.yml` is manual by design. It publishes an
-  immutable version tag, records the manifest digest, scans the tools image, and
-  builds the real Bastion image on both architectures before running the existing
-  Docker contract.
-- `docker-release.yml`, `docker-ci.yml`, and `packaging/docker/publish.sh` use
-  the prebuilt path only when `BASTION_TOOLS_IMAGE` is set and valid. Otherwise
-  they retain the current in-image compilation path.
+- `packaging/docker/Dockerfile` is now the single source of truth. Its `tools`
+  target publishes the scratch multi-platform tools image, while
+  `runner-prebuilt` consumes an external tools image and `runner-legacy` keeps
+  the old in-image compilation path.
+- `docker-release.yml` fingerprints only the tools section of the Dockerfile.
+  It reuses the matching immutable GHCR tag, or builds, scans, and publishes
+  that tools image once when the tag is missing.
+- `BASTION_TOOLS_IMAGE` is an optional exact-digest override. The repository
+  variable `BASTION_DISABLE_PREBUILT_TOOLS=true` is the explicit kill switch for
+  the legacy path.
+- `docker-ci.yml` and `packaging/docker/publish.sh` support both Dockerfile
+  targets; normal CI/local builds remain on the legacy target unless an exact
+  override is supplied.
 - The tools image has not been published yet, so the faster path is not active.
 - Local Docker validation is currently blocked because the Docker daemon socket
   was initially unavailable, but Colima BuildKit checks now pass. A real local
   amd64 build reached the unchanged tcld command and hit a Go 1.26.6 runtime
   segmentation fault during module downloads. This is a local Colima/toolchain
   environment failure; the current GitHub release has already built this exact
-  command successfully. The GitHub tools workflow remains the authoritative
+  command successfully. The GitHub release workflow remains the authoritative
   architecture and runtime verification.
-- The prebuilt Bastion Dockerfile was also assembled successfully in Colima
+- The unified prebuilt Bastion target was also assembled successfully in Colima
   using the existing v0.5.2 image as a path-compatible stand-in for the future
   tools image. All external binary copies completed and the tool version probes
   passed. The full local contract later failed at its existing MongoDB policy
   assertion (`connect` not disabled), so the new tools image still requires the
   GitHub amd64/arm64 contract run before activation.
 
-### How we will detect tool updates
+### How engineers update tools
 
-PR 1 does not automatically detect upstream releases. It records a deliberate
-snapshot of the Temporal CLI, tcld, and MCP Toolbox source commits and versions.
-
-Recommended follow-up:
-
-- Run a scheduled weekly or monthly checker on the default branch.
-- Compare the pinned commits and versions in `packaging/docker/tools.Dockerfile`
-  with the latest upstream releases/tags.
-- Open an issue or pull request when an update is found; do not silently rebuild
-  the active tools digest.
-- Treat Trivy/security advisories as an emergency update trigger, even if there
-  is no normal version release.
-- After review, publish a new tools-image version, run both architecture
-  contracts, and update `BASTION_TOOLS_IMAGE` to the new digest.
-
-Dependabot can help with the Go base image, Go modules, and GitHub Actions, but
-these tools are currently pinned through custom Git commit arguments, so a small
-purpose-built checker will be needed for reliable upstream release detection.
+- Change the tool version and commit in the `tools` section of
+  `packaging/docker/Dockerfile`.
+- Open and review the normal source PR. The next Bastion release automatically
+  detects the changed tools fingerprint and creates the new tools image before
+  building Bastion.
+- The workflow scans the tools image and the normal release contract verifies
+  the resulting Bastion image on both architectures.
+- `BASTION_TOOLS_IMAGE` usually needs no maintenance. Set it only when an
+  engineer needs to force a known digest. Set
+  `BASTION_DISABLE_PREBUILT_TOOLS=true` to activate the legacy kill switch.
+- A scheduled upstream checker remains a useful future improvement for opening
+  update PRs, but publishing and selection are now automated in the release.
 
 ### Phase 2 — Depot canary
 
@@ -376,11 +378,11 @@ purpose-built checker will be needed for reliable upstream release detection.
 - `packaging/docker/Dockerfile`
 - `package.json`
 - `pnpm-lock.yaml`
-- possibly a new tools-image Dockerfile/workflow and the release documentation
+- possibly an upstream release-detection workflow and the release documentation
 
-Files changed for PR 1 are the two Dockerfiles, the tools workflow, the two
-existing workflow selectors, the local publish helper, the release runbook,
-and this continuity plan. pnpm and Depot are unchanged.
+Files changed for PR 1 are the unified Dockerfile, the release/CI workflow
+changes, the local publish helper, the release runbook, and this continuity
+plan. pnpm and Depot are unchanged.
 
 ## Open questions
 
