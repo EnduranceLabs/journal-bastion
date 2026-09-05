@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 permissions: {}
 
@@ -24,6 +25,7 @@ jobs:
       packages: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      image_tag: ${{ steps.version.outputs.image_tag }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,14 +53,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag must be v<major>.<minor>.<patch>: $GITHUB_REF_NAME" >&2
-            exit 1
-          fi
-
           package_version="$(node -p "require('./package.json').version")"
           python_version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' clients/python/pyproject.toml)"
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$GITHUB_REF_NAME" != "main" ]; then
+              echo "Release canary must run from main: $GITHUB_REF_NAME" >&2
+              exit 1
+            fi
+            version="$package_version"
+            image_tag="canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Release tag must be v<major>.<minor>.<patch>: $GITHUB_REF_NAME" >&2
+              exit 1
+            fi
+            image_tag="$version"
+          fi
+
           if [ "$version" != "$package_version" ] || [ "$version" != "$python_version" ]; then
             echo "Tag $version does not match package=$package_version python=$python_version" >&2
             exit 1
@@ -71,6 +84,7 @@ jobs:
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR for immutable-tag check
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -80,6 +94,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Reject an existing immutable version tag
+        if: github.event_name != 'workflow_dispatch'
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -120,7 +135,12 @@ jobs:
     permissions: {}
     steps:
       - name: Record release approval
-        run: echo "Publishing journal-bastion ${{ needs.validate.outputs.version }}"
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Approving journal-bastion release canary ${{ needs.validate.outputs.image_tag }}"
+          else
+            echo "Publishing journal-bastion ${{ needs.validate.outputs.version }}"
+          fi
 
   resolve-tools:
     name: Resolve Go tools image
@@ -185,7 +205,11 @@ jobs:
           fi
 
           fingerprint="$(awk '/^FROM node:22-slim.* AS build$/{exit} {print}' packaging/docker/Dockerfile | sha256sum | cut -c1-12)"
-          tag="$TOOLS_IMAGE:tools-$fingerprint"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$TOOLS_IMAGE:tools-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          else
+            tag="$TOOLS_IMAGE:tools-$fingerprint"
+          fi
           if digest="$(docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null)" && \
              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
             echo "mode=prebuilt" >> "$GITHUB_OUTPUT"
@@ -599,6 +623,8 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.validate.outputs.version }}
+          IMAGE_TAG: ${{ needs.validate.outputs.image_tag }}
+          CANARY: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f | sort)
@@ -612,16 +638,22 @@ jobs:
             refs+=("$IMAGE@sha256:$(basename "$digest_file")")
           done
 
-          minor="${VERSION%.*}"
-          short_sha="${GITHUB_SHA:0:12}"
-          docker buildx imagetools create \
-            --tag "$IMAGE:$VERSION" \
-            --tag "$IMAGE:$minor" \
-            --tag "$IMAGE:latest" \
-            --tag "$IMAGE:sha-$short_sha" \
-            "${refs[@]}"
+          if [ "$CANARY" = "true" ]; then
+            docker buildx imagetools create \
+              --tag "$IMAGE:$IMAGE_TAG" \
+              "${refs[@]}"
+          else
+            minor="${VERSION%.*}"
+            short_sha="${GITHUB_SHA:0:12}"
+            docker buildx imagetools create \
+              --tag "$IMAGE:$VERSION" \
+              --tag "$IMAGE:$minor" \
+              --tag "$IMAGE:latest" \
+              --tag "$IMAGE:sha-$short_sha" \
+              "${refs[@]}"
+          fi
 
-          docker buildx imagetools inspect --raw "$IMAGE:$VERSION" > /tmp/manifest.json
+          docker buildx imagetools inspect --raw "$IMAGE:$IMAGE_TAG" > /tmp/manifest.json
           digest="sha256:$(sha256sum /tmp/manifest.json | awk '{print $1}')"
           docker buildx imagetools inspect "$IMAGE@$digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
@@ -659,13 +691,15 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.validate.outputs.version }}
+          IMAGE_TAG: ${{ needs.validate.outputs.image_tag }}
         run: |
-          docker pull --platform "${{ matrix.platform }}" "$IMAGE:$VERSION"
-          BUILD_IMAGE=0 IMAGE="$IMAGE:$VERSION" EXPECTED_VERSION="$VERSION" \
+          docker pull --platform "${{ matrix.platform }}" "$IMAGE:$IMAGE_TAG"
+          BUILD_IMAGE=0 IMAGE="$IMAGE:$IMAGE_TAG" EXPECTED_VERSION="$VERSION" \
             testing/docker/run-contract.sh
 
   release:
     name: Create GitHub release
+    if: github.event_name != 'workflow_dispatch'
     needs:
       - validate
       - manifest

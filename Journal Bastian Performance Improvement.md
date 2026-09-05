@@ -18,8 +18,10 @@ Do not remove a safety check just to improve the clock time.
 ## Current status
 
 PR 1 is merged and the prebuilt path is the default for releases, with an
-explicit kill switch for the legacy build. PR 2 is adding an opt-in Depot
-canary while preserving the existing per-architecture release verification.
+explicit kill switch for the legacy build. PR 2 is merged and Depot is enabled
+for normal CI and release image builds while preserving the existing
+per-architecture release verification. The next step is a manual release
+canary before the first real Depot-backed release.
 `BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
 
 Repository: `EnduranceLabs/journal-bastion`
@@ -28,7 +30,9 @@ Workflow: [docker-release.yml](https://github.com/EnduranceLabs/journal-bastion/
 
 PR 1 was developed on `perf/prebuilt-go-tools` and its automation changes are
 merged in [PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58).
-The current PR 2 checkout is `perf/depot-canary`.
+PR 2 was developed on `perf/depot-canary` and merged in
+[PR #59](https://github.com/EnduranceLabs/journal-bastion/pull/59). The current
+release-canary checkout is `perf/release-canary`.
 
 ## Problem in simple English
 
@@ -260,7 +264,9 @@ Conclusion: PR 1 is reasonable to implement, but “no production risk” should
 - Add explicit `buildx-fallback: true` only if the canary confirms its behavior.
 - Add a safe canary/test path and timing reporting.
 
-Because the variable remains unset initially, this PR can merge without changing production behavior. After the canary, enable the variable through GitHub configuration rather than another code change.
+PR 2 is merged and `DEPOT_PROJECT_ID` is enabled. The PR and post-merge Docker
+contract canaries passed; the manual release canary remains before the first
+real tagged release.
 
 ### Operational rollout — enable Depot
 
@@ -289,7 +295,7 @@ Work one small, measurable item at a time. Update this file after every item.
 - [x] Identify the largest current steps.
 - [ ] Capture the untruncated BuildKit log for one release and separate build time from cache import/export time.
 - [ ] Record cache hit/miss behavior for both architecture scopes.
-- [ ] Decide how to run a canary without creating a misleading production release.
+- [x] Decide how to run a canary without creating a misleading production release.
 
 ### Deferred — pnpm upgrade
 
@@ -324,12 +330,14 @@ Implementation notes:
   supports the existing Buildx path. `packaging/docker/publish.sh` remains on
   the legacy target unless an exact tools-image override is supplied.
 - The tools image has not been published yet, so the prebuilt-tools path is
-  not active.
+  not active until the manual release canary builds or reuses it.
 - Post-merge Container CI run
-  [#33979773300](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33979773300)
-  passed source checks and both native Docker contract jobs. That run used the
-  legacy path because the Depot repository variable had not yet been added; the
-  new Depot path is exercised by the PR Docker contract matrix.
+  [#33982646563](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33982646563)
+  passed source checks and both native Docker contract jobs using Depot.
+- Dependabot Docker CI run
+  [#33982755750](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33982755750)
+  passed source checks and both native Docker contract jobs using Buildx, with
+  Depot skipped as intended.
 - Local Docker validation is currently blocked because the Docker daemon socket
   was initially unavailable, but Colima BuildKit checks now pass. A real local
   amd64 build reached the unchanged tcld command and hit a Go 1.26.6 runtime
@@ -368,6 +376,7 @@ Implementation notes:
 - [x] Add an opt-in Depot build path while preserving the Buildx path.
 - [x] Preserve the per-architecture digest output and existing verification flow.
 - [x] Replace only the canary build action first.
+- [x] Add a manual release canary that uses run-specific tags and skips GitHub release creation.
 - [ ] Test the current per-architecture digest output, Trivy scan, manifest creation, and attestations.
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
 - [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
@@ -386,6 +395,23 @@ Implementation notes:
   cache export remains on the Buildx path for comparison.
 - `buildx-fallback` is explicitly disabled for the initial canary so Depot
   authentication or build failures remain visible.
+
+### Manual release canary procedure
+
+- Open Actions → `Publish container image` → `Run workflow` on `main`.
+- Approve the existing `container-release` environment when prompted.
+- Confirm the run uses `canary-<run-id>-<attempt>` for the Bastion image and
+  `tools-canary-<run-id>-<attempt>` for a newly built tools image.
+- Confirm both native image builds use Depot, followed by digest verification,
+  Trivy, manifest creation, SBOM/provenance attestation, anonymous pulls, and
+  the Docker contract on amd64 and arm64.
+- Confirm the `Create GitHub release` job is skipped and no stable, `latest`, or
+  minor-version tags are created.
+- Record the run URL, cold/warm timings, cache behavior, and any canary tags;
+  remove the temporary tags manually after validation is complete.
+- The manual canary is implemented in the existing release workflow, so the
+  current Depot OIDC trust relationship and `DEPOT_PROJECT_ID` variable are
+  reused; no additional repository setting is required.
 
 ### Phase 3 — production rollout
 
