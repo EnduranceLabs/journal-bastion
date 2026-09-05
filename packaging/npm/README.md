@@ -100,3 +100,16 @@ To update a tool, change its pinned version and commit in
 release tag. The release workflow creates and verifies the new tools image as
 part of that run. The first release after a tools change is slower; later
 releases reuse the published image.
+
+### Depot canary
+
+Release image builds and Docker contract checks use Depot when the non-secret
+`DEPOT_PROJECT_ID` Actions repository variable is set. The workflows keep the
+existing per-architecture digest, scan, manifest, attestation, and
+public-contract verification flow.
+The PR Docker contract matrix is the safe canary: it loads `ci-*` images for
+contract testing without publishing release tags.
+Depot authenticates through the GitHub OIDC trust relationship; no Depot token
+secret is required. If the variable is unset, the existing GitHub Buildx path
+is used. Buildx fallback is intentionally disabled during the initial canary
+so a Depot configuration or build failure is visible.
