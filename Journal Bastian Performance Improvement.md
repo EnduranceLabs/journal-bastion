@@ -25,8 +25,8 @@ Repository: `EnduranceLabs/journal-bastion`
 
 Workflow: [docker-release.yml](https://github.com/EnduranceLabs/journal-bastion/actions/workflows/docker-release.yml)
 
-The local checkout is the PR branch `perf/prebuilt-go-tools`; these follow-up
-changes are not yet committed or pushed.
+The local checkout is the PR branch `perf/prebuilt-go-tools`. The automation
+changes are committed and pushed in [PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58).
 
 ## Problem in simple English
 
@@ -322,6 +322,11 @@ Implementation notes:
   targets; normal CI/local builds remain on the legacy target unless an exact
   override is supplied.
 - The tools image has not been published yet, so the faster path is not active.
+- Latest PR validation is not mergeable yet: both GitHub Docker contract jobs
+  failed before the build because CI selected `runner-legacy` with no tools
+  image configured, but still passed an empty `TOOLS_IMAGE` build argument.
+  The Dockerfile rejects that empty external stage. This needs a workflow fix
+  and a new CI run before merge.
 - Local Docker validation is currently blocked because the Docker daemon socket
   was initially unavailable, but Colima BuildKit checks now pass. A real local
   amd64 build reached the unchanged tcld command and hit a Go 1.26.6 runtime
