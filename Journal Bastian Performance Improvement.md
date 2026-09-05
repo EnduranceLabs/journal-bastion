@@ -376,8 +376,9 @@ Implementation notes:
 - [x] Add an opt-in Depot build path while preserving the Buildx path.
 - [x] Preserve the per-architecture digest output and existing verification flow.
 - [x] Replace only the canary build action first.
-- [x] Add a manual release canary that uses run-specific tags and skips GitHub release creation.
-- [ ] Test the current per-architecture digest output, Trivy scan, manifest creation, and attestations.
+- [x] Add a manual release canary that uses a run-specific image tag and skips GitHub release creation.
+- [x] Test the current per-architecture digest output, Trivy scan, manifest creation, and attestations.
+- [x] Make the canary tools tag fingerprint-based so warm runs can reuse it.
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
 - [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
 - [ ] Decide whether to keep GHA cache export, change its mode, or remove it after measuring.
@@ -395,13 +396,21 @@ Implementation notes:
   cache export remains on the Buildx path for comparison.
 - `buildx-fallback` is explicitly disabled for the initial canary so Depot
   authentication or build failures remain visible.
+- Manual release canary
+  [#33984226254](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33984226254)
+  passed the full release verification path. The cold run took about 25 minutes
+  and included the first Buildx tools-image build; the final Depot builds took
+  about 42 seconds on amd64 and 48 seconds on arm64.
 
 ### Manual release canary procedure
 
 - Open Actions → `Publish container image` → `Run workflow` on `main`.
 - Approve the existing `container-release` environment when prompted.
 - Confirm the run uses `canary-<run-id>-<attempt>` for the Bastion image and
-  `tools-canary-<run-id>-<attempt>` for a newly built tools image.
+  `tools-canary-<dockerfile-fingerprint>` for the tools image.
+- Run the canary a second time from the same `main` commit. `Resolve Go tools
+  image` should reuse the existing tools image, and the tools build/manifest
+  jobs should be skipped.
 - Confirm both native image builds use Depot, followed by digest verification,
   Trivy, manifest creation, SBOM/provenance attestation, anonymous pulls, and
   the Docker contract on amd64 and arm64.

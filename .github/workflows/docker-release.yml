@@ -206,7 +206,7 @@ jobs:
 
           fingerprint="$(awk '/^FROM node:22-slim.* AS build$/{exit} {print}' packaging/docker/Dockerfile | sha256sum | cut -c1-12)"
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            tag="$TOOLS_IMAGE:tools-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            tag="$TOOLS_IMAGE:tools-canary-$fingerprint"
           else
             tag="$TOOLS_IMAGE:tools-$fingerprint"
           fi
