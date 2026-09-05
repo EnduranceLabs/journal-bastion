@@ -99,7 +99,7 @@ jobs:
         run: |
           if [ "$DISABLE_PREBUILT" = "true" ] || [ -z "$TOOLS_IMAGE" ]; then
             echo "target=runner-legacy" >> "$GITHUB_OUTPUT"
-            echo "tools-image=scratch" >> "$GITHUB_OUTPUT"
+            echo "tools_image=scratch" >> "$GITHUB_OUTPUT"
             echo "BASTION_DISABLE_PREBUILT_TOOLS is enabled or BASTION_TOOLS_IMAGE is unset; using the legacy in-image Go build"
           else
             if [[ ! "$TOOLS_IMAGE" =~ ^ghcr\.io/endurancelabs/journal-bastion-tools@sha256:[0-9a-f]{64}$ ]]; then
@@ -107,7 +107,7 @@ jobs:
               exit 1
             fi
             echo "target=runner-prebuilt" >> "$GITHUB_OUTPUT"
-            echo "tools-image=$TOOLS_IMAGE" >> "$GITHUB_OUTPUT"
+            echo "tools_image=$TOOLS_IMAGE" >> "$GITHUB_OUTPUT"
             echo "Using pinned prebuilt Go tools image: $TOOLS_IMAGE"
           fi
 
@@ -121,7 +121,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: journal-bastion:ci-${{ matrix.arch }}
           build-args: |
-            TOOLS_IMAGE=${{ steps.image.outputs.tools-image }}
+            TOOLS_IMAGE=${{ steps.image.outputs.tools_image }}
           cache-from: type=gha,scope=container-ci-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=container-ci-${{ matrix.arch }}
 
