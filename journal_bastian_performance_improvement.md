@@ -22,12 +22,10 @@ releases, with an explicit kill switch for the legacy build. Depot is enabled
 for normal CI and release image builds while preserving the existing
 per-architecture release verification.
 
-The current cold canary passed the full release path. The first follow-up warm
-canary reused the tools image and ran both Depot builds, but exposed another
-workflow dependency bug that skipped digest verification and everything after
-it. The completion guard caught the problem, so another small workflow fix is
-needed before the warm result can be accepted or a real Depot-backed release
-can proceed.
+The current cold canary passed the full release path. After fixing the
+optional-job dependency handling, the valid warm canary also passed the full
+release path in about 4 minutes 30 seconds. The Depot rollout is ready for a
+versioned release after the normal version-bump checks complete.
 `BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
 
 Repository: `EnduranceLabs/journal-bastion`
@@ -62,6 +60,8 @@ Evidence comes from GitHub Actions API data for successful runs.
 |---|---:|---:|---|
 | [v0.5.2 / run 33863076699](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33863076699) | success | 29m 07s | validate 7m58s; amd64 build 19m06s; arm64 build 13m50s |
 | [v0.5.1 / run 33856307401](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33856307401) | success | 29m 27s | validate 7m58s; amd64 build 20m25s; arm64 build 12m40s |
+| [current cold canary / run 33986346429](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986346429) | success | 6m 14s | tools image built once; final Depot builds and all verification passed |
+| [current warm canary / run 34045962872](https://github.com/EnduranceLabs/journal-bastion/actions/runs/34045962872) | success | 4m 31s | tools image reused; final Depot builds and all verification passed |
 
 Detailed v0.5.2 timings:
 
@@ -320,7 +320,7 @@ Work one small, measurable item at a time. Update this file after every item.
 - [x] Add a deliberate tool-update path and document rollback.
 - [x] Automatically detect, reuse, or publish the tools image during a normal release.
 - [x] Add an explicit kill switch for the legacy build path.
-- [ ] Measure cold and warm release builds.
+- [x] Measure cold and warm release builds.
 
 Implementation notes:
 
@@ -398,9 +398,9 @@ Implementation notes:
 - [x] Test the current per-architecture digest output, Trivy scan, manifest creation, and attestations.
 - [x] Make the canary tools tag fingerprint-based so warm runs can reuse it.
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
-- [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
+- [x] Compare Depot cold/warm results with the GitHub Buildx baseline.
 - [ ] Decide whether to keep GHA cache export, change its mode, or remove it after measuring.
-- [ ] Fix optional-job dependency handling across the full release chain and pass a warm canary with the completion guard.
+- [x] Fix optional-job dependency handling across the full release chain and pass a warm canary with the completion guard.
 
 Implementation notes:
 
@@ -432,6 +432,12 @@ Implementation notes:
   verification, manifest creation, and public verification were still skipped
   because the downstream jobs also inherited the optional-job dependency. The
   completion guard failed as designed.
+- Valid warm manual release canary
+  [#34045962872](https://github.com/EnduranceLabs/journal-bastion/actions/runs/34045962872)
+  reused the tools image, ran both Depot builds, passed digest verification,
+  manifest creation, public pulls, Docker contracts, and the completion guard
+  in about 4 minutes 30 seconds. GitHub release creation was skipped as
+  intended.
 - The release build and every downstream verification job must explicitly
   allow a successful direct dependency to continue when an optional tools job
   is skipped.
