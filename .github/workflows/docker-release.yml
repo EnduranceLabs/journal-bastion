@@ -430,6 +430,11 @@ jobs:
       - validate
       - approve
       - select-tools
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.approve.result == 'success' &&
+      needs.select-tools.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -740,3 +745,75 @@ jobs:
             --verify-tag \
             --title "Journal Bastion $VERSION" \
             --notes-file /tmp/release-notes.md
+
+  check-release:
+    name: Check release workflow completion
+    if: always()
+    needs:
+      - validate
+      - approve
+      - resolve-tools
+      - build-tools
+      - publish-tools
+      - select-tools
+      - build
+      - verify-digest
+      - manifest
+      - verify-release
+      - release
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Verify expected job results
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TOOLS_NEEDS_BUILD: ${{ needs.resolve-tools.outputs.needs_build }}
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          APPROVE_RESULT: ${{ needs.approve.result }}
+          RESOLVE_TOOLS_RESULT: ${{ needs.resolve-tools.result }}
+          BUILD_TOOLS_RESULT: ${{ needs.build-tools.result }}
+          PUBLISH_TOOLS_RESULT: ${{ needs.publish-tools.result }}
+          SELECT_TOOLS_RESULT: ${{ needs.select-tools.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          VERIFY_DIGEST_RESULT: ${{ needs.verify-digest.result }}
+          MANIFEST_RESULT: ${{ needs.manifest.result }}
+          VERIFY_RELEASE_RESULT: ${{ needs.verify-release.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+        run: |
+          set -euo pipefail
+
+          check_result() {
+            local job="$1"
+            local actual="$2"
+            local expected="$3"
+            if [ "$actual" != "$expected" ]; then
+              echo "$job completed with '$actual'; expected '$expected'" >&2
+              exit 1
+            fi
+          }
+
+          check_result validate "$VALIDATE_RESULT" success
+          check_result approve "$APPROVE_RESULT" success
+          check_result resolve-tools "$RESOLVE_TOOLS_RESULT" success
+          check_result select-tools "$SELECT_TOOLS_RESULT" success
+          check_result build "$BUILD_RESULT" success
+          check_result verify-digest "$VERIFY_DIGEST_RESULT" success
+          check_result manifest "$MANIFEST_RESULT" success
+          check_result verify-release "$VERIFY_RELEASE_RESULT" success
+
+          if [ "$TOOLS_NEEDS_BUILD" = "true" ]; then
+            check_result build-tools "$BUILD_TOOLS_RESULT" success
+            check_result publish-tools "$PUBLISH_TOOLS_RESULT" success
+          else
+            check_result build-tools "$BUILD_TOOLS_RESULT" skipped
+            check_result publish-tools "$PUBLISH_TOOLS_RESULT" skipped
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            check_result release "$RELEASE_RESULT" skipped
+          else
+            check_result release "$RELEASE_RESULT" success
+          fi
+
+          echo "Release workflow completed with the expected job results."
