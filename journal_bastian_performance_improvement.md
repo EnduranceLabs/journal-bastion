@@ -1,6 +1,6 @@
 # Journal Bastian Performance Improvement
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Goal
 
@@ -17,22 +17,29 @@ Do not remove a safety check just to improve the clock time.
 
 ## Current status
 
-PR 1 is merged and the prebuilt path is the default for releases, with an
-explicit kill switch for the legacy build. PR 2 is merged and Depot is enabled
+PRs #58 through #61 are merged. The prebuilt tools path is the default for
+releases, with an explicit kill switch for the legacy build. Depot is enabled
 for normal CI and release image builds while preserving the existing
-per-architecture release verification. The next step is a manual release
-canary before the first real Depot-backed release.
+per-architecture release verification.
+
+The current cold canary passed the full release path. The follow-up warm
+canary reused the tools image but exposed a workflow dependency bug that
+skipped the main build and all verification jobs. A small follow-up fix is
+needed before the warm result can be accepted or a real Depot-backed release
+can proceed.
 `BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
 
 Repository: `EnduranceLabs/journal-bastion`
 
 Workflow: [docker-release.yml](https://github.com/EnduranceLabs/journal-bastion/actions/workflows/docker-release.yml)
 
-PR 1 was developed on `perf/prebuilt-go-tools` and its automation changes are
-merged in [PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58).
-PR 2 was developed on `perf/depot-canary` and merged in
-[PR #59](https://github.com/EnduranceLabs/journal-bastion/pull/59). The current
-release-canary checkout is `perf/release-canary`.
+The prebuilt tools changes were merged in
+[PR #58](https://github.com/EnduranceLabs/journal-bastion/pull/58), Depot
+support in [PR #59](https://github.com/EnduranceLabs/journal-bastion/pull/59),
+the manual release canary in
+[PR #60](https://github.com/EnduranceLabs/journal-bastion/pull/60), and warm
+tools-image reuse plus the lowercase runbook filename in
+[PR #61](https://github.com/EnduranceLabs/journal-bastion/pull/61).
 
 ## Problem in simple English
 
@@ -306,9 +313,9 @@ Work one small, measurable item at a time. Update this file after every item.
 
 - [x] Define the tools image contents and architecture layout.
 - [x] Define the tool update policy: source commit, tool version, Go image, and dependency patches.
-- [ ] Build and publish a test tools image with SBOM/provenance.
+- [x] Build and publish a test tools image with SBOM/provenance.
 - [x] Add a main-image path that consumes an exact tools image digest.
-- [ ] Verify binary versions and the Docker contract on amd64 and arm64.
+- [x] Verify binary versions and the Docker contract on amd64 and arm64.
 - [x] Add a deliberate tool-update path and document rollback.
 - [x] Automatically detect, reuse, or publish the tools image during a normal release.
 - [x] Add an explicit kill switch for the legacy build path.
@@ -329,8 +336,8 @@ Implementation notes:
 - `docker-ci.yml` uses Depot when `DEPOT_PROJECT_ID` is set and otherwise
   supports the existing Buildx path. `packaging/docker/publish.sh` remains on
   the legacy target unless an exact tools-image override is supplied.
-- The tools image has not been published yet, so the prebuilt-tools path is
-  not active until the manual release canary builds or reuses it.
+- The tools image was built, scanned, and published by the current cold
+  canary. The prebuilt-tools path is now active for subsequent releases.
 - Post-merge Container CI run
   [#33982646563](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33982646563)
   passed source checks and both native Docker contract jobs using Depot.
@@ -338,6 +345,16 @@ Implementation notes:
   [#33982755750](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33982755750)
   passed source checks and both native Docker contract jobs using Buildx, with
   Depot skipped as intended.
+- Current cold manual release canary
+  [#33986346429](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986346429)
+  built the tools image, built the two Depot-backed Bastion images, and passed
+  the digest, manifest, attestation, anonymous-pull, and Docker contract
+  checks. GitHub release creation was skipped as intended.
+- Warm manual release canary
+  [#33986711215](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986711215)
+  correctly reused the tools image, but GitHub skipped the Bastion build and
+  all downstream verification jobs because the optional tools-publish job was
+  skipped. The workflow was incorrectly reported as successful.
 - Local Docker validation is currently blocked because the Docker daemon socket
   was initially unavailable, but Colima BuildKit checks now pass. A real local
   amd64 build reached the unchanged tcld command and hit a Go 1.26.6 runtime
@@ -382,6 +399,7 @@ Implementation notes:
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
 - [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
 - [ ] Decide whether to keep GHA cache export, change its mode, or remove it after measuring.
+- [ ] Fix the optional-job dependency handling and add a completion guard before accepting a warm canary.
 
 Implementation notes:
 
@@ -401,6 +419,14 @@ Implementation notes:
   passed the full release verification path. The cold run took about 25 minutes
   and included the first Buildx tools-image build; the final Depot builds took
   about 42 seconds on amd64 and 48 seconds on arm64.
+- The current fingerprint-based cold canary
+  [#33986346429](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986346429)
+  passed the full release verification path in about 6 minutes. Its warm
+  follow-up
+  [#33986711215](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986711215)
+  reused the tools image but skipped the final image and verification jobs.
+  The release build must explicitly allow the successful tools-selection job
+  to continue when the optional tools-publish job is skipped.
 
 ### Manual release canary procedure
 
@@ -410,7 +436,7 @@ Implementation notes:
   `tools-canary-<dockerfile-fingerprint>` for the tools image.
 - Run the canary a second time from the same `main` commit. `Resolve Go tools
   image` should reuse the existing tools image, and the tools build/manifest
-  jobs should be skipped.
+  jobs should be skipped. The final Bastion build must still run.
 - Confirm both native image builds use Depot, followed by digest verification,
   Trivy, manifest creation, SBOM/provenance attestation, anonymous pulls, and
   the Docker contract on amd64 and arm64.
