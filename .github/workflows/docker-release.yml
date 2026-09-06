@@ -554,6 +554,10 @@ jobs:
     needs:
       - validate
       - build
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.build.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -596,6 +600,10 @@ jobs:
     needs:
       - validate
       - verify-digest
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.verify-digest.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -675,6 +683,10 @@ jobs:
     needs:
       - validate
       - manifest
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.manifest.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -704,7 +716,12 @@ jobs:
 
   release:
     name: Create GitHub release
-    if: github.event_name != 'workflow_dispatch'
+    if: >-
+      always() &&
+      github.event_name != 'workflow_dispatch' &&
+      needs.validate.result == 'success' &&
+      needs.manifest.result == 'success' &&
+      needs.verify-release.result == 'success'
     needs:
       - validate
       - manifest

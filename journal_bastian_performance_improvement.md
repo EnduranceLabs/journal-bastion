@@ -17,14 +17,15 @@ Do not remove a safety check just to improve the clock time.
 
 ## Current status
 
-PRs #58 through #61 are merged. The prebuilt tools path is the default for
+PRs #58 through #62 are merged. The prebuilt tools path is the default for
 releases, with an explicit kill switch for the legacy build. Depot is enabled
 for normal CI and release image builds while preserving the existing
 per-architecture release verification.
 
-The current cold canary passed the full release path. The follow-up warm
-canary reused the tools image but exposed a workflow dependency bug that
-skipped the main build and all verification jobs. A small follow-up fix is
+The current cold canary passed the full release path. The first follow-up warm
+canary reused the tools image and ran both Depot builds, but exposed another
+workflow dependency bug that skipped digest verification and everything after
+it. The completion guard caught the problem, so another small workflow fix is
 needed before the warm result can be accepted or a real Depot-backed release
 can proceed.
 `BASTION_TOOLS_IMAGE` remains an optional exact-digest override.
@@ -399,7 +400,7 @@ Implementation notes:
 - [ ] Test `buildx-fallback: true` deliberately and document the expected slow fallback.
 - [ ] Compare Depot cold/warm results with the GitHub Buildx baseline.
 - [ ] Decide whether to keep GHA cache export, change its mode, or remove it after measuring.
-- [ ] Fix the optional-job dependency handling and add a completion guard before accepting a warm canary.
+- [ ] Fix optional-job dependency handling across the full release chain and pass a warm canary with the completion guard.
 
 Implementation notes:
 
@@ -425,8 +426,15 @@ Implementation notes:
   follow-up
   [#33986711215](https://github.com/EnduranceLabs/journal-bastion/actions/runs/33986711215)
   reused the tools image but skipped the final image and verification jobs.
-  The release build must explicitly allow the successful tools-selection job
-  to continue when the optional tools-publish job is skipped.
+- Canary after PR #62
+  [#34044884775](https://github.com/EnduranceLabs/journal-bastion/actions/runs/34044884775)
+  reused the tools image and both Depot image builds passed. Digest
+  verification, manifest creation, and public verification were still skipped
+  because the downstream jobs also inherited the optional-job dependency. The
+  completion guard failed as designed.
+- The release build and every downstream verification job must explicitly
+  allow a successful direct dependency to continue when an optional tools job
+  is skipped.
 
 ### Manual release canary procedure
 
@@ -440,6 +448,8 @@ Implementation notes:
 - Confirm both native image builds use Depot, followed by digest verification,
   Trivy, manifest creation, SBOM/provenance attestation, anonymous pulls, and
   the Docker contract on amd64 and arm64.
+- Confirm `Check release workflow completion` passes; this is the final signal
+  that no required release job was silently skipped.
 - Confirm the `Create GitHub release` job is skipped and no stable, `latest`, or
   minor-version tags are created.
 - Record the run URL, cold/warm timings, cache behavior, and any canary tags;
